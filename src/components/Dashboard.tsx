@@ -1,12 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { INITIAL_PLAYERS, type Match, type Player } from "@/lib/types";
-
-function winPct(player: Player): number {
-  const games = player.wins + player.losses;
-  return games === 0 ? 0 : (player.wins / games) * 100;
-}
+import { currentStreak, headToHead, sortByStanding, winPct } from "@/lib/stats";
+import { Card, StatCard, StreakBadge } from "@/components/ui";
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleString(undefined, {
@@ -27,6 +25,7 @@ export default function Dashboard() {
   const [matches, setMatches] = useState<Match[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const [newPlayerName, setNewPlayerName] = useState("");
   const [winnerId, setWinnerId] = useState("");
@@ -61,15 +60,7 @@ export default function Dashboard() {
     if (!loserId) setLoserId(players[1]?.id ?? players[0].id);
   }, [players, winnerId, loserId]);
 
-  const sortedPlayers = useMemo(
-    () =>
-      [...players].sort((a, b) => {
-        if (b.wins !== a.wins) return b.wins - a.wins;
-        if (winPct(b) !== winPct(a)) return winPct(b) - winPct(a);
-        return a.name.localeCompare(b.name);
-      }),
-    [players]
-  );
+  const sortedPlayers = useMemo(() => sortByStanding(players), [players]);
 
   const recentMatches = useMemo(
     () => [...matches].sort((a, b) => b.playedAt.localeCompare(a.playedAt)),
@@ -77,6 +68,21 @@ export default function Dashboard() {
   );
 
   const playerName = (id: string) => players.find((p) => p.id === id)?.name ?? "Unknown";
+
+  const { hottest, coldest } = useMemo(() => {
+    const streaks = players
+      .map((p) => ({ player: p, streak: currentStreak(p.id, matches) }))
+      .filter((s): s is { player: Player; streak: NonNullable<typeof s.streak> } => s.streak !== null);
+
+    const hottest = streaks
+      .filter((s) => s.streak.type === "W")
+      .sort((a, b) => b.streak.count - a.streak.count)[0];
+    const coldest = streaks
+      .filter((s) => s.streak.type === "L")
+      .sort((a, b) => b.streak.count - a.streak.count)[0];
+
+    return { hottest, coldest };
+  }, [players, matches]);
 
   async function handleAddPlayer(e: React.FormEvent) {
     e.preventDefault();
@@ -131,38 +137,48 @@ export default function Dashboard() {
   }
 
   const totalMatches = matches.length;
-  const topPlayer = sortedPlayers[0];
+  const topPlayer = sortedPlayers.find((p) => p.wins + p.losses > 0);
 
   return (
     <div className="min-h-screen bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-50">
       <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
-        <header className="mb-8 flex flex-col gap-1">
-          <p className="text-sm font-medium uppercase tracking-widest text-emerald-600 dark:text-emerald-400">
-            Household League
-          </p>
-          <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
-            🏓 Ping Pong Leaderboard
-          </h1>
-          <p className="text-zinc-500 dark:text-zinc-400">
-            Track wins, losses, and bragging rights.
-          </p>
+        <header className="mb-8 flex items-start justify-between gap-4">
+          <div className="flex flex-col gap-1">
+            <p className="text-sm font-medium uppercase tracking-widest text-emerald-600 dark:text-emerald-400">
+              Household League
+            </p>
+            <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
+              🏓 Ping Pong Leaderboard
+            </h1>
+            <p className="text-zinc-500 dark:text-zinc-400">
+              Track wins, losses, streaks, and bragging rights.
+            </p>
+          </div>
+          <Link
+            href="/admin"
+            className="mt-1 shrink-0 rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-500 transition-colors hover:border-zinc-300 hover:text-zinc-700 dark:border-zinc-800 dark:text-zinc-500 dark:hover:border-zinc-700 dark:hover:text-zinc-300"
+          >
+            Admin
+          </Link>
         </header>
 
         {loading ? (
           <p className="text-sm text-zinc-500 dark:text-zinc-400">Loading leaderboard…</p>
         ) : (
           <>
-            <section className="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-4">
+            <section className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
               <StatCard label="Players" value={players.length} />
               <StatCard label="Matches Played" value={totalMatches} />
-              <StatCard label="Top Player" value={topPlayer ? topPlayer.name : "—"} />
+              <StatCard label="Top Player" value={topPlayer ? topPlayer.name : "—"} accent="emerald" />
               <StatCard
-                label="Top Win %"
-                value={
-                  topPlayer && topPlayer.wins + topPlayer.losses > 0
-                    ? `${winPct(topPlayer).toFixed(0)}%`
-                    : "—"
-                }
+                label="Hottest Streak"
+                value={hottest ? `${hottest.player.name} · W${hottest.streak.count}` : "—"}
+                accent="emerald"
+              />
+              <StatCard
+                label="Coldest Streak"
+                value={coldest ? `${coldest.player.name} · L${coldest.streak.count}` : "—"}
+                accent="rose"
               />
             </section>
 
@@ -170,7 +186,7 @@ export default function Dashboard() {
               <div className="lg:col-span-2">
                 <Card title="Standings">
                   <div className="overflow-x-auto">
-                    <table className="w-full min-w-[420px] border-collapse text-left text-sm">
+                    <table className="w-full min-w-[480px] border-collapse text-left text-sm">
                       <thead>
                         <tr className="border-b border-zinc-200 text-xs uppercase tracking-wide text-zinc-500 dark:border-zinc-800 dark:text-zinc-400">
                           <th className="py-2 pr-2 font-medium">#</th>
@@ -178,29 +194,85 @@ export default function Dashboard() {
                           <th className="py-2 pr-2 text-right font-medium">Wins</th>
                           <th className="py-2 pr-2 text-right font-medium">Losses</th>
                           <th className="py-2 pr-2 text-right font-medium">Win %</th>
+                          <th className="py-2 pr-2 text-right font-medium">Streak</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {sortedPlayers.map((p, i) => (
-                          <tr
-                            key={p.id}
-                            className="border-b border-zinc-100 last:border-0 dark:border-zinc-900"
-                          >
-                            <td className="py-3 pr-2 text-zinc-500 dark:text-zinc-400">
-                              {i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : i + 1}
-                            </td>
-                            <td className="py-3 pr-2 font-medium">{p.name}</td>
-                            <td className="py-3 pr-2 text-right text-emerald-600 dark:text-emerald-400">
-                              {p.wins}
-                            </td>
-                            <td className="py-3 pr-2 text-right text-rose-500 dark:text-rose-400">
-                              {p.losses}
-                            </td>
-                            <td className="py-3 pr-2 text-right text-zinc-500 dark:text-zinc-400">
-                              {p.wins + p.losses === 0 ? "—" : `${winPct(p).toFixed(0)}%`}
-                            </td>
-                          </tr>
-                        ))}
+                        {sortedPlayers.map((p, i) => {
+                          const isExpanded = expandedId === p.id;
+                          const h2h = headToHead(p.id, matches);
+                          return (
+                            <Fragment key={p.id}>
+                              <tr
+                                onClick={() => setExpandedId(isExpanded ? null : p.id)}
+                                className="cursor-pointer border-b border-zinc-100 transition-colors last:border-0 hover:bg-zinc-50 dark:border-zinc-900 dark:hover:bg-zinc-800/50"
+                              >
+                                <td className="py-3 pr-2 text-zinc-500 dark:text-zinc-400">
+                                  {i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : i + 1}
+                                </td>
+                                <td className="py-3 pr-2 font-medium">
+                                  <span className="inline-flex items-center gap-1.5">
+                                    <span
+                                      className={
+                                        "inline-block text-zinc-400 transition-transform dark:text-zinc-600 " +
+                                        (isExpanded ? "rotate-90" : "")
+                                      }
+                                    >
+                                      ›
+                                    </span>
+                                    {p.name}
+                                  </span>
+                                </td>
+                                <td className="py-3 pr-2 text-right text-emerald-600 dark:text-emerald-400">
+                                  {p.wins}
+                                </td>
+                                <td className="py-3 pr-2 text-right text-rose-500 dark:text-rose-400">
+                                  {p.losses}
+                                </td>
+                                <td className="py-3 pr-2 text-right text-zinc-500 dark:text-zinc-400">
+                                  {p.wins + p.losses === 0 ? "—" : `${winPct(p).toFixed(0)}%`}
+                                </td>
+                                <td className="py-3 pr-2 text-right">
+                                  <StreakBadge streak={currentStreak(p.id, matches)} />
+                                </td>
+                              </tr>
+                              {isExpanded && (
+                                <tr className="border-b border-zinc-100 bg-zinc-50 dark:border-zinc-900 dark:bg-zinc-800/30">
+                                  <td colSpan={6} className="px-3 py-3">
+                                    <p className="mb-2 text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                                      {p.name}&apos;s head-to-head record
+                                    </p>
+                                    {h2h.length === 0 ? (
+                                      <p className="text-sm text-zinc-400 dark:text-zinc-600">
+                                        No matches recorded yet.
+                                      </p>
+                                    ) : (
+                                      <ul className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                                        {h2h.map((rec) => (
+                                          <li
+                                            key={rec.opponentId}
+                                            className="flex items-center justify-between rounded-lg bg-white px-3 py-1.5 text-sm dark:bg-zinc-900"
+                                          >
+                                            <span>vs {playerName(rec.opponentId)}</span>
+                                            <span className="font-medium">
+                                              <span className="text-emerald-600 dark:text-emerald-400">
+                                                {rec.wins}
+                                              </span>
+                                              <span className="text-zinc-400 dark:text-zinc-600">-</span>
+                                              <span className="text-rose-500 dark:text-rose-400">
+                                                {rec.losses}
+                                              </span>
+                                            </span>
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    )}
+                                  </td>
+                                </tr>
+                              )}
+                            </Fragment>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
@@ -247,7 +319,7 @@ export default function Dashboard() {
                       <select
                         value={winnerId}
                         onChange={(e) => setWinnerId(e.target.value)}
-                        className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+                        className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm outline-none transition-colors focus:border-emerald-500 dark:border-zinc-700 dark:bg-zinc-900"
                       >
                         {players.map((p) => (
                           <option key={p.id} value={p.id}>
@@ -261,7 +333,7 @@ export default function Dashboard() {
                       <select
                         value={loserId}
                         onChange={(e) => setLoserId(e.target.value)}
-                        className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+                        className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm outline-none transition-colors focus:border-emerald-500 dark:border-zinc-700 dark:bg-zinc-900"
                       >
                         {players.map((p) => (
                           <option key={p.id} value={p.id}>
@@ -287,7 +359,7 @@ export default function Dashboard() {
                       value={newPlayerName}
                       onChange={(e) => setNewPlayerName(e.target.value)}
                       placeholder="Player name"
-                      className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+                      className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm outline-none transition-colors focus:border-emerald-500 dark:border-zinc-700 dark:bg-zinc-900"
                     />
                     <button
                       type="submit"
@@ -309,24 +381,6 @@ export default function Dashboard() {
           </>
         )}
       </div>
-    </div>
-  );
-}
-
-function StatCard({ label, value }: { label: string; value: string | number }) {
-  return (
-    <div className="rounded-xl border border-zinc-200 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900">
-      <p className="text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400">{label}</p>
-      <p className="mt-1 text-xl font-semibold">{value}</p>
-    </div>
-  );
-}
-
-function Card({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
-      <h2 className="mb-4 text-lg font-semibold">{title}</h2>
-      {children}
     </div>
   );
 }
