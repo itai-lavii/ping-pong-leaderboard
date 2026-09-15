@@ -119,6 +119,20 @@ export default function Dashboard() {
       setError("Winner and loser must be different players.");
       return;
     }
+    const winnerScoreNum = Number(winnerScore);
+    const loserScoreNum = Number(loserScore);
+    if (
+      winnerScore.trim() === "" ||
+      loserScore.trim() === "" ||
+      !Number.isInteger(winnerScoreNum) ||
+      !Number.isInteger(loserScoreNum) ||
+      winnerScoreNum < 0 ||
+      loserScoreNum < 0 ||
+      winnerScoreNum <= loserScoreNum
+    ) {
+      setError("Enter a valid score for both players — the winner's score must be higher.");
+      return;
+    }
     setSubmitting(true);
     setError("");
     try {
@@ -128,8 +142,8 @@ export default function Dashboard() {
         body: JSON.stringify({
           winnerId,
           loserId,
-          winnerScore: winnerScore.trim() === "" ? undefined : Number(winnerScore),
-          loserScore: loserScore.trim() === "" ? undefined : Number(loserScore),
+          winnerScore: winnerScoreNum,
+          loserScore: loserScoreNum,
         }),
       });
       if (!res.ok) throw new Error(await parseErrorMessage(res));
@@ -362,9 +376,10 @@ export default function Dashboard() {
                         <input
                           type="number"
                           min={0}
+                          required
                           value={winnerScore}
                           onChange={(e) => setWinnerScore(e.target.value)}
-                          placeholder="Optional"
+                          placeholder="21"
                           className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm outline-none transition-colors focus:border-emerald-500 dark:border-zinc-700 dark:bg-zinc-900"
                         />
                       </label>
@@ -373,9 +388,10 @@ export default function Dashboard() {
                         <input
                           type="number"
                           min={0}
+                          required
                           value={loserScore}
                           onChange={(e) => setLoserScore(e.target.value)}
-                          placeholder="Optional"
+                          placeholder="15"
                           className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm outline-none transition-colors focus:border-emerald-500 dark:border-zinc-700 dark:bg-zinc-900"
                         />
                       </label>
