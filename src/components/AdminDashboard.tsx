@@ -334,6 +334,11 @@ export default function AdminDashboard() {
                         <span className="font-medium text-rose-500 dark:text-rose-400">
                           {playerName(m.loserId)}
                         </span>
+                        {m.winnerScore !== undefined && m.loserScore !== undefined && (
+                          <span className="ml-1.5 text-zinc-400 dark:text-zinc-600">
+                            {m.winnerScore}-{m.loserScore}
+                          </span>
+                        )}
                         <span className="ml-2 text-xs text-zinc-500 dark:text-zinc-400">
                           {formatDate(m.playedAt)}
                         </span>

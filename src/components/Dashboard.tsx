@@ -30,6 +30,8 @@ export default function Dashboard() {
   const [newPlayerName, setNewPlayerName] = useState("");
   const [winnerId, setWinnerId] = useState("");
   const [loserId, setLoserId] = useState("");
+  const [winnerScore, setWinnerScore] = useState("");
+  const [loserScore, setLoserScore] = useState("");
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -123,12 +125,19 @@ export default function Dashboard() {
       const res = await fetch("/api/matches", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ winnerId, loserId }),
+        body: JSON.stringify({
+          winnerId,
+          loserId,
+          winnerScore: winnerScore.trim() === "" ? undefined : Number(winnerScore),
+          loserScore: loserScore.trim() === "" ? undefined : Number(loserScore),
+        }),
       });
       if (!res.ok) throw new Error(await parseErrorMessage(res));
       const data = (await res.json()) as { players: Player[]; matches: Match[] };
       setPlayers(data.players);
       setMatches(data.matches);
+      setWinnerScore("");
+      setLoserScore("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to record match.");
     } finally {
@@ -299,6 +308,11 @@ export default function Dashboard() {
                               <span className="font-medium text-rose-500 dark:text-rose-400">
                                 {playerName(m.loserId)}
                               </span>
+                              {m.winnerScore !== undefined && m.loserScore !== undefined && (
+                                <span className="ml-1.5 text-zinc-400 dark:text-zinc-600">
+                                  {m.winnerScore}-{m.loserScore}
+                                </span>
+                              )}
                             </span>
                             <span className="text-xs text-zinc-500 dark:text-zinc-400">
                               {formatDate(m.playedAt)}
@@ -342,6 +356,30 @@ export default function Dashboard() {
                         ))}
                       </select>
                     </label>
+                    <div className="flex gap-3">
+                      <label className="flex flex-1 flex-col gap-1 text-sm">
+                        Winner Score
+                        <input
+                          type="number"
+                          min={0}
+                          value={winnerScore}
+                          onChange={(e) => setWinnerScore(e.target.value)}
+                          placeholder="Optional"
+                          className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm outline-none transition-colors focus:border-emerald-500 dark:border-zinc-700 dark:bg-zinc-900"
+                        />
+                      </label>
+                      <label className="flex flex-1 flex-col gap-1 text-sm">
+                        Loser Score
+                        <input
+                          type="number"
+                          min={0}
+                          value={loserScore}
+                          onChange={(e) => setLoserScore(e.target.value)}
+                          placeholder="Optional"
+                          className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm outline-none transition-colors focus:border-emerald-500 dark:border-zinc-700 dark:bg-zinc-900"
+                        />
+                      </label>
+                    </div>
                     <button
                       type="submit"
                       disabled={submitting}

@@ -14,6 +14,30 @@ export async function POST(request: Request) {
     );
   }
 
+  const hasWinnerScore = body?.winnerScore !== undefined && body?.winnerScore !== null && body?.winnerScore !== "";
+  const hasLoserScore = body?.loserScore !== undefined && body?.loserScore !== null && body?.loserScore !== "";
+  let winnerScore: number | undefined;
+  let loserScore: number | undefined;
+
+  if (hasWinnerScore || hasLoserScore) {
+    winnerScore = Number(body?.winnerScore);
+    loserScore = Number(body?.loserScore);
+    if (
+      !hasWinnerScore ||
+      !hasLoserScore ||
+      !Number.isInteger(winnerScore) ||
+      !Number.isInteger(loserScore) ||
+      winnerScore < 0 ||
+      loserScore < 0 ||
+      winnerScore <= loserScore
+    ) {
+      return NextResponse.json(
+        { error: "Enter a valid score for both players — the winner's score must be higher." },
+        { status: 400 }
+      );
+    }
+  }
+
   try {
     const players = await getPlayers();
     if (!players.some((p) => p.id === winnerId) || !players.some((p) => p.id === loserId)) {
@@ -31,6 +55,7 @@ export async function POST(request: Request) {
       winnerId,
       loserId,
       playedAt: new Date().toISOString(),
+      ...(winnerScore !== undefined && loserScore !== undefined ? { winnerScore, loserScore } : {}),
     };
     const updatedMatches = [...(await getMatches()), match];
 
