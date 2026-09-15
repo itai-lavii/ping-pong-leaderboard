@@ -54,10 +54,67 @@ export function headToHead(playerId: string, matches: Match[]): HeadToHeadRecord
   return [...records.values()].sort((a, b) => b.wins + b.losses - (a.wins + a.losses));
 }
 
-export function sortByStanding(players: Player[]): Player[] {
+export const STARTING_ELO = 1500;
+const ELO_K = 32;
+// Margin-of-victory multiplier, per (score diff / 20) + 1, capped so a single
+// blowout game can't swing a rating too far (a 21-5 game lands right at 1.8x).
+const MOV_CAP = 2;
+
+/**
+ * Elo ratings are derived fresh from full match history rather than stored
+ * incrementally, so editing or undoing any past match (not just the latest)
+ * stays correct automatically.
+ */
+export function computeEloRatings(players: Player[], matches: Match[]): Map<string, number> {
+  const ratings = new Map<string, number>();
+  for (const p of players) ratings.set(p.id, STARTING_ELO);
+
+  const ordered = [...matches].sort((a, b) => a.playedAt.localeCompare(b.playedAt));
+
+  for (const m of ordered) {
+    const winnerElo = ratings.get(m.winnerId) ?? STARTING_ELO;
+    const loserElo = ratings.get(m.loserId) ?? STARTING_ELO;
+
+    const expectedWinner = 1 / (1 + 10 ** ((loserElo - winnerElo) / 400));
+    const hasScore = m.winnerScore !== undefined && m.loserScore !== undefined;
+    const pointDiff = hasScore ? Math.abs(m.winnerScore! - m.loserScore!) : 0;
+    const movMultiplier = Math.min(MOV_CAP, 1 + pointDiff / 20);
+
+    const delta = ELO_K * (1 - expectedWinner) * movMultiplier;
+
+    ratings.set(m.winnerId, winnerElo + delta);
+    ratings.set(m.loserId, loserElo - delta);
+  }
+
+  return ratings;
+}
+
+export function eloFor(playerId: string, ratings: Map<string, number>): number {
+  return Math.round(ratings.get(playerId) ?? STARTING_ELO);
+}
+
+export function avgPointDiff(playerId: string, matches: Match[]): number | null {
+  const scored = matches.filter(
+    (m) =>
+      (m.winnerId === playerId || m.loserId === playerId) &&
+      m.winnerScore !== undefined &&
+      m.loserScore !== undefined
+  );
+  if (scored.length === 0) return null;
+
+  const total = scored.reduce((sum, m) => {
+    const diff = m.winnerId === playerId ? m.winnerScore! - m.loserScore! : m.loserScore! - m.winnerScore!;
+    return sum + diff;
+  }, 0);
+
+  return total / scored.length;
+}
+
+export function sortByElo(players: Player[], ratings: Map<string, number>): Player[] {
   return [...players].sort((a, b) => {
-    if (b.wins !== a.wins) return b.wins - a.wins;
-    if (winPct(b) !== winPct(a)) return winPct(b) - winPct(a);
+    const eloA = eloFor(a.id, ratings);
+    const eloB = eloFor(b.id, ratings);
+    if (eloB !== eloA) return eloB - eloA;
     return a.name.localeCompare(b.name);
   });
 }

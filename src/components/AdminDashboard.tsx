@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import type { Match, Player } from "@/lib/types";
-import { sortByStanding } from "@/lib/stats";
+import { computeEloRatings, eloFor, sortByElo } from "@/lib/stats";
 import { Card } from "@/components/ui";
 
 type AuthStatus = "checking" | "unauthenticated" | "authenticated";
@@ -38,6 +38,15 @@ export default function AdminDashboard() {
   const [undoingId, setUndoingId] = useState<string | null>(null);
   const [confirmingReset, setConfirmingReset] = useState(false);
   const [resetting, setResetting] = useState(false);
+
+  const [editingMatchId, setEditingMatchId] = useState<string | null>(null);
+  const [matchEdit, setMatchEdit] = useState({
+    winnerId: "",
+    loserId: "",
+    winnerScore: "",
+    loserScore: "",
+  });
+  const [savingMatchId, setSavingMatchId] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -81,7 +90,8 @@ export default function AdminDashboard() {
     );
   }, [players]);
 
-  const sortedPlayers = useMemo(() => sortByStanding(players), [players]);
+  const eloRatings = useMemo(() => computeEloRatings(players, matches), [players, matches]);
+  const sortedPlayers = useMemo(() => sortByElo(players, eloRatings), [players, eloRatings]);
   const recentMatches = useMemo(
     () => [...matches].sort((a, b) => b.playedAt.localeCompare(a.playedAt)),
     [matches]
@@ -154,6 +164,63 @@ export default function AdminDashboard() {
       setError(err instanceof Error ? err.message : "Failed to undo match.");
     } finally {
       setUndoingId(null);
+    }
+  }
+
+  function handleStartEditMatch(m: Match) {
+    setEditingMatchId(m.id);
+    setMatchEdit({
+      winnerId: m.winnerId,
+      loserId: m.loserId,
+      winnerScore: m.winnerScore !== undefined ? String(m.winnerScore) : "",
+      loserScore: m.loserScore !== undefined ? String(m.loserScore) : "",
+    });
+  }
+
+  function handleCancelEditMatch() {
+    setEditingMatchId(null);
+  }
+
+  async function handleSaveMatch(id: string) {
+    const winnerScoreNum = Number(matchEdit.winnerScore);
+    const loserScoreNum = Number(matchEdit.loserScore);
+    if (
+      !matchEdit.winnerId ||
+      !matchEdit.loserId ||
+      matchEdit.winnerId === matchEdit.loserId ||
+      !Number.isInteger(winnerScoreNum) ||
+      !Number.isInteger(loserScoreNum) ||
+      winnerScoreNum < 0 ||
+      loserScoreNum < 0 ||
+      winnerScoreNum <= loserScoreNum
+    ) {
+      setError(
+        "Winner and loser must be different players, and the winner's score must be a higher valid number."
+      );
+      return;
+    }
+    setSavingMatchId(id);
+    setError("");
+    try {
+      const res = await fetch(`/api/admin/matches/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          winnerId: matchEdit.winnerId,
+          loserId: matchEdit.loserId,
+          winnerScore: winnerScoreNum,
+          loserScore: loserScoreNum,
+        }),
+      });
+      if (!res.ok) throw new Error(await parseErrorMessage(res));
+      const data = (await res.json()) as { players: Player[]; matches: Match[] };
+      setPlayers(data.players);
+      setMatches(data.matches);
+      setEditingMatchId(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save match.");
+    } finally {
+      setSavingMatchId(null);
     }
   }
 
@@ -263,6 +330,7 @@ export default function AdminDashboard() {
                   <thead>
                     <tr className="border-b border-zinc-200 text-xs uppercase tracking-wide text-zinc-500 dark:border-zinc-800 dark:text-zinc-400">
                       <th className="py-2 pr-2 font-medium">Player</th>
+                      <th className="py-2 pr-2 font-medium">Elo</th>
                       <th className="py-2 pr-2 font-medium">Wins</th>
                       <th className="py-2 pr-2 font-medium">Losses</th>
                       <th className="py-2 pr-2 font-medium" />
@@ -272,6 +340,9 @@ export default function AdminDashboard() {
                     {sortedPlayers.map((p) => (
                       <tr key={p.id} className="border-b border-zinc-100 last:border-0 dark:border-zinc-900">
                         <td className="py-2 pr-2 font-medium">{p.name}</td>
+                        <td className="py-2 pr-2 text-zinc-500 dark:text-zinc-400">
+                          {eloFor(p.id, eloRatings)}
+                        </td>
                         <td className="py-2 pr-2">
                           <input
                             type="number"
@@ -320,38 +391,123 @@ export default function AdminDashboard() {
               {recentMatches.length === 0 ? (
                 <p className="text-sm text-zinc-500 dark:text-zinc-400">No matches recorded yet.</p>
               ) : (
-                <ul className="max-h-96 space-y-2 overflow-y-auto pr-1">
-                  {recentMatches.map((m) => (
-                    <li
-                      key={m.id}
-                      className="flex items-center justify-between gap-3 rounded-lg bg-zinc-100 px-3 py-2 text-sm dark:bg-zinc-900"
-                    >
-                      <span>
-                        <span className="font-medium text-emerald-600 dark:text-emerald-400">
-                          {playerName(m.winnerId)}
-                        </span>{" "}
-                        beat{" "}
-                        <span className="font-medium text-rose-500 dark:text-rose-400">
-                          {playerName(m.loserId)}
-                        </span>
-                        {m.winnerScore !== undefined && m.loserScore !== undefined && (
-                          <span className="ml-1.5 text-zinc-400 dark:text-zinc-600">
-                            {m.winnerScore}-{m.loserScore}
-                          </span>
-                        )}
-                        <span className="ml-2 text-xs text-zinc-500 dark:text-zinc-400">
-                          {formatDate(m.playedAt)}
-                        </span>
-                      </span>
-                      <button
-                        onClick={() => handleUndo(m.id)}
-                        disabled={undoingId === m.id}
-                        className="shrink-0 rounded-lg border border-zinc-300 px-3 py-1 text-xs font-medium transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:hover:bg-zinc-800"
+                <ul className="max-h-[32rem] space-y-2 overflow-y-auto pr-1">
+                  {recentMatches.map((m) =>
+                    editingMatchId === m.id ? (
+                      <li
+                        key={m.id}
+                        className="flex flex-col gap-2 rounded-lg bg-zinc-100 px-3 py-3 text-sm dark:bg-zinc-900"
                       >
-                        {undoingId === m.id ? "Undoing…" : "Undo"}
-                      </button>
-                    </li>
-                  ))}
+                        <div className="flex flex-wrap items-end gap-2">
+                          <label className="flex flex-col gap-1 text-xs text-zinc-500 dark:text-zinc-400">
+                            Winner
+                            <select
+                              value={matchEdit.winnerId}
+                              onChange={(e) =>
+                                setMatchEdit((prev) => ({ ...prev, winnerId: e.target.value }))
+                              }
+                              className="rounded-lg border border-zinc-300 bg-white px-2 py-1 text-sm outline-none focus:border-emerald-500 dark:border-zinc-700 dark:bg-zinc-950"
+                            >
+                              {players.map((p) => (
+                                <option key={p.id} value={p.id}>
+                                  {p.name}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                          <input
+                            type="number"
+                            min={0}
+                            value={matchEdit.winnerScore}
+                            onChange={(e) =>
+                              setMatchEdit((prev) => ({ ...prev, winnerScore: e.target.value }))
+                            }
+                            placeholder="Score"
+                            className="w-20 rounded-lg border border-zinc-300 bg-white px-2 py-1 text-sm outline-none focus:border-emerald-500 dark:border-zinc-700 dark:bg-zinc-950"
+                          />
+                          <label className="flex flex-col gap-1 text-xs text-zinc-500 dark:text-zinc-400">
+                            Loser
+                            <select
+                              value={matchEdit.loserId}
+                              onChange={(e) =>
+                                setMatchEdit((prev) => ({ ...prev, loserId: e.target.value }))
+                              }
+                              className="rounded-lg border border-zinc-300 bg-white px-2 py-1 text-sm outline-none focus:border-emerald-500 dark:border-zinc-700 dark:bg-zinc-950"
+                            >
+                              {players.map((p) => (
+                                <option key={p.id} value={p.id}>
+                                  {p.name}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                          <input
+                            type="number"
+                            min={0}
+                            value={matchEdit.loserScore}
+                            onChange={(e) =>
+                              setMatchEdit((prev) => ({ ...prev, loserScore: e.target.value }))
+                            }
+                            placeholder="Score"
+                            className="w-20 rounded-lg border border-zinc-300 bg-white px-2 py-1 text-sm outline-none focus:border-emerald-500 dark:border-zinc-700 dark:bg-zinc-950"
+                          />
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleSaveMatch(m.id)}
+                            disabled={savingMatchId === m.id}
+                            className="rounded-lg bg-emerald-600 px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {savingMatchId === m.id ? "Saving…" : "Save"}
+                          </button>
+                          <button
+                            onClick={handleCancelEditMatch}
+                            className="rounded-lg border border-zinc-300 px-3 py-1 text-xs font-medium transition-colors hover:bg-white dark:border-zinc-700 dark:hover:bg-zinc-800"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </li>
+                    ) : (
+                      <li
+                        key={m.id}
+                        className="flex items-center justify-between gap-3 rounded-lg bg-zinc-100 px-3 py-2 text-sm dark:bg-zinc-900"
+                      >
+                        <span>
+                          <span className="font-medium text-emerald-600 dark:text-emerald-400">
+                            {playerName(m.winnerId)}
+                          </span>{" "}
+                          beat{" "}
+                          <span className="font-medium text-rose-500 dark:text-rose-400">
+                            {playerName(m.loserId)}
+                          </span>
+                          {m.winnerScore !== undefined && m.loserScore !== undefined && (
+                            <span className="ml-1.5 text-zinc-400 dark:text-zinc-600">
+                              {m.winnerScore}-{m.loserScore}
+                            </span>
+                          )}
+                          <span className="ml-2 text-xs text-zinc-500 dark:text-zinc-400">
+                            {formatDate(m.playedAt)}
+                          </span>
+                        </span>
+                        <div className="flex shrink-0 gap-2">
+                          <button
+                            onClick={() => handleStartEditMatch(m)}
+                            className="rounded-lg border border-zinc-300 px-3 py-1 text-xs font-medium transition-colors hover:bg-white dark:border-zinc-700 dark:hover:bg-zinc-800"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleUndo(m.id)}
+                            disabled={undoingId === m.id}
+                            className="rounded-lg border border-zinc-300 px-3 py-1 text-xs font-medium transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:hover:bg-zinc-800"
+                          >
+                            {undoingId === m.id ? "Undoing…" : "Undo"}
+                          </button>
+                        </div>
+                      </li>
+                    )
+                  )}
                 </ul>
               )}
             </Card>

@@ -3,7 +3,15 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { INITIAL_PLAYERS, type Match, type Player } from "@/lib/types";
-import { currentStreak, headToHead, sortByStanding, winPct } from "@/lib/stats";
+import {
+  avgPointDiff,
+  computeEloRatings,
+  currentStreak,
+  eloFor,
+  headToHead,
+  sortByElo,
+  winPct,
+} from "@/lib/stats";
 import { Card, StatCard, StreakBadge } from "@/components/ui";
 
 function formatDate(iso: string): string {
@@ -62,7 +70,8 @@ export default function Dashboard() {
     if (!loserId) setLoserId(players[1]?.id ?? players[0].id);
   }, [players, winnerId, loserId]);
 
-  const sortedPlayers = useMemo(() => sortByStanding(players), [players]);
+  const eloRatings = useMemo(() => computeEloRatings(players, matches), [players, matches]);
+  const sortedPlayers = useMemo(() => sortByElo(players, eloRatings), [players, eloRatings]);
 
   const recentMatches = useMemo(
     () => [...matches].sort((a, b) => b.playedAt.localeCompare(a.playedAt)),
@@ -174,7 +183,7 @@ export default function Dashboard() {
               🏓 Ping Pong Leaderboard
             </h1>
             <p className="text-zinc-500 dark:text-zinc-400">
-              Track wins, losses, streaks, and bragging rights.
+              Elo power rankings, streaks, head-to-head, and bragging rights.
             </p>
           </div>
           <Link
@@ -192,7 +201,11 @@ export default function Dashboard() {
             <section className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
               <StatCard label="Players" value={players.length} />
               <StatCard label="Matches Played" value={totalMatches} />
-              <StatCard label="Top Player" value={topPlayer ? topPlayer.name : "—"} accent="emerald" />
+              <StatCard
+                label="Top Player"
+                value={topPlayer ? `${topPlayer.name} · ${eloFor(topPlayer.id, eloRatings)}` : "—"}
+                accent="emerald"
+              />
               <StatCard
                 label="Hottest Streak"
                 value={hottest ? `${hottest.player.name} · W${hottest.streak.count}` : "—"}
@@ -207,16 +220,18 @@ export default function Dashboard() {
 
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
               <div className="lg:col-span-2">
-                <Card title="Standings">
+                <Card title="Power Rankings">
                   <div className="overflow-x-auto">
-                    <table className="w-full min-w-[480px] border-collapse text-left text-sm">
+                    <table className="w-full min-w-[640px] border-collapse text-left text-sm">
                       <thead>
                         <tr className="border-b border-zinc-200 text-xs uppercase tracking-wide text-zinc-500 dark:border-zinc-800 dark:text-zinc-400">
                           <th className="py-2 pr-2 font-medium">#</th>
                           <th className="py-2 pr-2 font-medium">Player</th>
+                          <th className="py-2 pr-2 text-right font-medium">Elo</th>
                           <th className="py-2 pr-2 text-right font-medium">Wins</th>
                           <th className="py-2 pr-2 text-right font-medium">Losses</th>
                           <th className="py-2 pr-2 text-right font-medium">Win %</th>
+                          <th className="py-2 pr-2 text-right font-medium">Avg Diff</th>
                           <th className="py-2 pr-2 text-right font-medium">Streak</th>
                         </tr>
                       </thead>
@@ -246,6 +261,9 @@ export default function Dashboard() {
                                     {p.name}
                                   </span>
                                 </td>
+                                <td className="py-3 pr-2 text-right font-semibold">
+                                  {eloFor(p.id, eloRatings)}
+                                </td>
                                 <td className="py-3 pr-2 text-right text-emerald-600 dark:text-emerald-400">
                                   {p.wins}
                                 </td>
@@ -255,13 +273,20 @@ export default function Dashboard() {
                                 <td className="py-3 pr-2 text-right text-zinc-500 dark:text-zinc-400">
                                   {p.wins + p.losses === 0 ? "—" : `${winPct(p).toFixed(0)}%`}
                                 </td>
+                                <td className="py-3 pr-2 text-right text-zinc-500 dark:text-zinc-400">
+                                  {(() => {
+                                    const diff = avgPointDiff(p.id, matches);
+                                    if (diff === null) return "—";
+                                    return `${diff > 0 ? "+" : ""}${diff.toFixed(1)}`;
+                                  })()}
+                                </td>
                                 <td className="py-3 pr-2 text-right">
                                   <StreakBadge streak={currentStreak(p.id, matches)} />
                                 </td>
                               </tr>
                               {isExpanded && (
                                 <tr className="border-b border-zinc-100 bg-zinc-50 dark:border-zinc-900 dark:bg-zinc-800/30">
-                                  <td colSpan={6} className="px-3 py-3">
+                                  <td colSpan={8} className="px-3 py-3">
                                     <p className="mb-2 text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
                                       {p.name}&apos;s head-to-head record
                                     </p>
