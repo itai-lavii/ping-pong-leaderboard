@@ -1,3 +1,5 @@
+import { formatDate } from "@/lib/format";
+
 export function StatCard({
   label,
   value,
@@ -63,5 +65,43 @@ export function StreakBadge({ streak }: { streak: { type: "W" | "L"; count: numb
       {streak.type}
       {streak.count}
     </span>
+  );
+}
+
+export function MatchRow({
+  winnerName,
+  loserName,
+  winnerScore,
+  loserScore,
+  playedAt,
+  delta,
+}: {
+  winnerName: string;
+  loserName: string;
+  winnerScore?: number;
+  loserScore?: number;
+  playedAt: string;
+  delta: number | null;
+}) {
+  return (
+    <li className="flex items-center justify-between rounded-lg bg-zinc-100 px-3 py-2 text-sm dark:bg-zinc-900">
+      <span>
+        <span className="font-medium text-emerald-600 dark:text-emerald-400">{winnerName}</span>
+        {delta !== null && (
+          <span className="ml-1 text-xs text-emerald-600/70 dark:text-emerald-400/70">+{delta}</span>
+        )}{" "}
+        beat{" "}
+        <span className="font-medium text-rose-500 dark:text-rose-400">{loserName}</span>
+        {delta !== null && (
+          <span className="ml-1 text-xs text-rose-500/70 dark:text-rose-400/70">-{delta}</span>
+        )}
+        {winnerScore !== undefined && loserScore !== undefined && (
+          <span className="ml-1.5 text-zinc-400 dark:text-zinc-600">
+            {winnerScore}-{loserScore}
+          </span>
+        )}
+      </span>
+      <span className="text-xs text-zinc-500 dark:text-zinc-400">{formatDate(playedAt)}</span>
+    </li>
   );
 }

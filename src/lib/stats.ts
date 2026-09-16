@@ -55,10 +55,32 @@ export function headToHead(playerId: string, matches: Match[]): HeadToHeadRecord
 }
 
 export const STARTING_ELO = 1500;
-const ELO_K = 32;
+export const ELO_K = 32;
 // Margin-of-victory multiplier, per (score diff / 20) + 1, capped so a single
 // blowout game can't swing a rating too far (a 21-5 game lands right at 1.8x).
-const MOV_CAP = 2;
+export const MOV_CAP = 2;
+
+/** Probability the winner "should" have won, based on the pre-match rating gap alone. */
+export function expectedScore(winnerElo: number, loserElo: number): number {
+  return 1 / (1 + 10 ** ((loserElo - winnerElo) / 400));
+}
+
+/** How lopsided the score was, scaled into a rating-shift multiplier. */
+export function movMultiplier(winnerScore?: number, loserScore?: number): number {
+  const hasScore = winnerScore !== undefined && loserScore !== undefined;
+  const pointDiff = hasScore ? Math.abs(winnerScore! - loserScore!) : 0;
+  return Math.min(MOV_CAP, 1 + pointDiff / 20);
+}
+
+/** Rating points the winner gains (and loser loses) for a single match. */
+export function eloDelta(
+  winnerElo: number,
+  loserElo: number,
+  winnerScore?: number,
+  loserScore?: number
+): number {
+  return ELO_K * (1 - expectedScore(winnerElo, loserElo)) * movMultiplier(winnerScore, loserScore);
+}
 
 export interface EloMatchResult {
   winnerEloBefore: number;
@@ -71,12 +93,7 @@ function applyEloMatch(ratings: Map<string, number>, m: Match): EloMatchResult {
   const winnerBefore = ratings.get(m.winnerId) ?? STARTING_ELO;
   const loserBefore = ratings.get(m.loserId) ?? STARTING_ELO;
 
-  const expectedWinner = 1 / (1 + 10 ** ((loserBefore - winnerBefore) / 400));
-  const hasScore = m.winnerScore !== undefined && m.loserScore !== undefined;
-  const pointDiff = hasScore ? Math.abs(m.winnerScore! - m.loserScore!) : 0;
-  const movMultiplier = Math.min(MOV_CAP, 1 + pointDiff / 20);
-
-  const delta = ELO_K * (1 - expectedWinner) * movMultiplier;
+  const delta = eloDelta(winnerBefore, loserBefore, m.winnerScore, m.loserScore);
   const winnerAfter = winnerBefore + delta;
   const loserAfter = loserBefore - delta;
 

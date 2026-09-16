@@ -13,16 +13,7 @@ import {
   sortByElo,
   winPct,
 } from "@/lib/stats";
-import { Card, StatCard, StreakBadge } from "@/components/ui";
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
+import { Card, MatchRow, StatCard, StreakBadge } from "@/components/ui";
 
 async function parseErrorMessage(res: Response): Promise<string> {
   const body = await res.json().catch(() => null);
@@ -40,6 +31,8 @@ export default function Dashboard() {
   const [loserId, setLoserId] = useState("");
   const [winnerScore, setWinnerScore] = useState("");
   const [loserScore, setLoserScore] = useState("");
+  const [compareAId, setCompareAId] = useState("");
+  const [compareBId, setCompareBId] = useState("");
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -68,7 +61,9 @@ export default function Dashboard() {
     if (players.length === 0) return;
     if (!winnerId) setWinnerId(players[0].id);
     if (!loserId) setLoserId(players[1]?.id ?? players[0].id);
-  }, [players, winnerId, loserId]);
+    if (!compareAId) setCompareAId(players[0].id);
+    if (!compareBId) setCompareBId(players[1]?.id ?? players[0].id);
+  }, [players, winnerId, loserId, compareAId, compareBId]);
 
   const eloRatings = useMemo(() => computeEloRatings(players, matches), [players, matches]);
   const eloHistory = useMemo(() => computeEloHistory(players, matches), [players, matches]);
@@ -146,6 +141,34 @@ export default function Dashboard() {
   const totalMatches = matches.length;
   const topPlayer = sortedPlayers.find((p) => p.wins + p.losses > 0);
 
+  const compareA = players.find((p) => p.id === compareAId) ?? null;
+  const compareB = players.find((p) => p.id === compareBId) ?? null;
+  const compareMatches = useMemo(
+    () =>
+      matches
+        .filter(
+          (m) =>
+            (m.winnerId === compareAId && m.loserId === compareBId) ||
+            (m.winnerId === compareBId && m.loserId === compareAId)
+        )
+        .sort((a, b) => b.playedAt.localeCompare(a.playedAt)),
+    [matches, compareAId, compareBId]
+  );
+  const compareAWins = compareMatches.filter((m) => m.winnerId === compareAId).length;
+  const compareBWins = compareMatches.length - compareAWins;
+  const compareScoredMatches = compareMatches.filter(
+    (m) => m.winnerScore !== undefined && m.loserScore !== undefined
+  );
+  const compareAvgMargin =
+    compareScoredMatches.length === 0
+      ? null
+      : compareScoredMatches.reduce((sum, m) => {
+          const diff =
+            m.winnerId === compareAId ? m.winnerScore! - m.loserScore! : m.loserScore! - m.winnerScore!;
+          return sum + diff;
+        }, 0) / compareScoredMatches.length;
+  const compareStreak = currentStreak(compareAId, compareMatches);
+
   return (
     <div className="min-h-screen bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-50">
       <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
@@ -161,12 +184,20 @@ export default function Dashboard() {
               Elo power rankings, streaks, head-to-head, and bragging rights.
             </p>
           </div>
-          <Link
-            href="/admin"
-            className="mt-1 shrink-0 rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-500 transition-colors hover:border-zinc-300 hover:text-zinc-700 dark:border-zinc-800 dark:text-zinc-500 dark:hover:border-zinc-700 dark:hover:text-zinc-300"
-          >
-            Admin
-          </Link>
+          <div className="mt-1 flex shrink-0 gap-2">
+            <Link
+              href="/elo"
+              className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-500 transition-colors hover:border-zinc-300 hover:text-zinc-700 dark:border-zinc-800 dark:text-zinc-500 dark:hover:border-zinc-700 dark:hover:text-zinc-300"
+            >
+              How Elo Works
+            </Link>
+            <Link
+              href="/admin"
+              className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-500 transition-colors hover:border-zinc-300 hover:text-zinc-700 dark:border-zinc-800 dark:text-zinc-500 dark:hover:border-zinc-700 dark:hover:text-zinc-300"
+            >
+              Admin
+            </Link>
+          </div>
         </header>
 
         {loading ? (
@@ -359,38 +390,15 @@ export default function Dashboard() {
                           ? Math.round(eloChange.winnerEloAfter - eloChange.winnerEloBefore)
                           : null;
                         return (
-                          <li
+                          <MatchRow
                             key={m.id}
-                            className="flex items-center justify-between rounded-lg bg-zinc-100 px-3 py-2 text-sm dark:bg-zinc-900"
-                          >
-                            <span>
-                              <span className="font-medium text-emerald-600 dark:text-emerald-400">
-                                {playerName(m.winnerId)}
-                              </span>
-                              {delta !== null && (
-                                <span className="ml-1 text-xs text-emerald-600/70 dark:text-emerald-400/70">
-                                  +{delta}
-                                </span>
-                              )}{" "}
-                              beat{" "}
-                              <span className="font-medium text-rose-500 dark:text-rose-400">
-                                {playerName(m.loserId)}
-                              </span>
-                              {delta !== null && (
-                                <span className="ml-1 text-xs text-rose-500/70 dark:text-rose-400/70">
-                                  -{delta}
-                                </span>
-                              )}
-                              {m.winnerScore !== undefined && m.loserScore !== undefined && (
-                                <span className="ml-1.5 text-zinc-400 dark:text-zinc-600">
-                                  {m.winnerScore}-{m.loserScore}
-                                </span>
-                              )}
-                            </span>
-                            <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                              {formatDate(m.playedAt)}
-                            </span>
-                          </li>
+                            winnerName={playerName(m.winnerId)}
+                            loserName={playerName(m.loserId)}
+                            winnerScore={m.winnerScore}
+                            loserScore={m.loserScore}
+                            playedAt={m.playedAt}
+                            delta={delta}
+                          />
                         );
                       })}
                     </ul>
@@ -398,8 +406,109 @@ export default function Dashboard() {
                 </Card>
               </div>
 
+              <div className="order-4 lg:col-span-3 lg:col-start-1 lg:row-start-3">
+                <Card title="Compare Players">
+                  <div className="mb-4 flex flex-wrap items-center gap-2">
+                    <select
+                      value={compareAId}
+                      onChange={(e) => setCompareAId(e.target.value)}
+                      className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm outline-none transition-colors focus:border-emerald-500 dark:border-zinc-700 dark:bg-zinc-900"
+                    >
+                      {players.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="text-sm text-zinc-400 dark:text-zinc-600">vs</span>
+                    <select
+                      value={compareBId}
+                      onChange={(e) => setCompareBId(e.target.value)}
+                      className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm outline-none transition-colors focus:border-emerald-500 dark:border-zinc-700 dark:bg-zinc-900"
+                    >
+                      {players.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {compareAId === compareBId ? (
+                    <p className="text-sm text-zinc-400 dark:text-zinc-600">
+                      Pick two different players to compare.
+                    </p>
+                  ) : (
+                    <>
+                      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+                        <StatCard label="Head-to-Head" value={`${compareAWins}-${compareBWins}`} />
+                        <StatCard
+                          label={`${compareA?.name ?? ""} Elo`}
+                          value={eloFor(compareAId, eloRatings)}
+                          accent="emerald"
+                        />
+                        <StatCard
+                          label={`${compareB?.name ?? ""} Elo`}
+                          value={eloFor(compareBId, eloRatings)}
+                          accent="rose"
+                        />
+                        <StatCard
+                          label={`${compareA?.name ?? ""}'s Avg Margin`}
+                          value={
+                            compareAvgMargin === null
+                              ? "—"
+                              : `${compareAvgMargin > 0 ? "+" : ""}${compareAvgMargin.toFixed(1)}`
+                          }
+                        />
+                        <StatCard
+                          label="Current Form"
+                          value={
+                            compareStreak
+                              ? `${compareA?.name ?? ""} ${compareStreak.type}${compareStreak.count}`
+                              : "—"
+                          }
+                          accent={
+                            compareStreak?.type === "W"
+                              ? "emerald"
+                              : compareStreak?.type === "L"
+                                ? "rose"
+                                : undefined
+                          }
+                        />
+                      </div>
+
+                      {compareMatches.length === 0 ? (
+                        <p className="text-sm text-zinc-400 dark:text-zinc-600">
+                          No matches recorded between {compareA?.name} and {compareB?.name} yet.
+                        </p>
+                      ) : (
+                        <ul className="max-h-80 space-y-2 overflow-y-auto pr-1">
+                          {compareMatches.map((m) => {
+                            const eloChange = eloHistory.get(m.id);
+                            const delta = eloChange
+                              ? Math.round(eloChange.winnerEloAfter - eloChange.winnerEloBefore)
+                              : null;
+                            return (
+                              <MatchRow
+                                key={m.id}
+                                winnerName={playerName(m.winnerId)}
+                                loserName={playerName(m.loserId)}
+                                winnerScore={m.winnerScore}
+                                loserScore={m.loserScore}
+                                playedAt={m.playedAt}
+                                delta={delta}
+                              />
+                            );
+                          })}
+                        </ul>
+                      )}
+                    </>
+                  )}
+                </Card>
+              </div>
+
               {error && (
-                <div className="order-4 lg:col-start-3 lg:row-start-2">
+                <div className="order-5 lg:col-start-3 lg:row-start-2">
                   <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-600 dark:bg-rose-950 dark:text-rose-400">
                     {error}
                   </p>

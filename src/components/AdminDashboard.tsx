@@ -4,18 +4,10 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import type { Match, Player } from "@/lib/types";
 import { computeEloHistory, computeEloRatings, eloFor, sortByElo } from "@/lib/stats";
+import { formatDate } from "@/lib/format";
 import { Card } from "@/components/ui";
 
 type AuthStatus = "checking" | "unauthenticated" | "authenticated";
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
 
 async function parseErrorMessage(res: Response): Promise<string> {
   const body = await res.json().catch(() => null);
