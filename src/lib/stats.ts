@@ -60,6 +60,37 @@ const ELO_K = 32;
 // blowout game can't swing a rating too far (a 21-5 game lands right at 1.8x).
 const MOV_CAP = 2;
 
+export interface EloMatchResult {
+  winnerEloBefore: number;
+  winnerEloAfter: number;
+  loserEloBefore: number;
+  loserEloAfter: number;
+}
+
+function applyEloMatch(ratings: Map<string, number>, m: Match): EloMatchResult {
+  const winnerBefore = ratings.get(m.winnerId) ?? STARTING_ELO;
+  const loserBefore = ratings.get(m.loserId) ?? STARTING_ELO;
+
+  const expectedWinner = 1 / (1 + 10 ** ((loserBefore - winnerBefore) / 400));
+  const hasScore = m.winnerScore !== undefined && m.loserScore !== undefined;
+  const pointDiff = hasScore ? Math.abs(m.winnerScore! - m.loserScore!) : 0;
+  const movMultiplier = Math.min(MOV_CAP, 1 + pointDiff / 20);
+
+  const delta = ELO_K * (1 - expectedWinner) * movMultiplier;
+  const winnerAfter = winnerBefore + delta;
+  const loserAfter = loserBefore - delta;
+
+  ratings.set(m.winnerId, winnerAfter);
+  ratings.set(m.loserId, loserAfter);
+
+  return {
+    winnerEloBefore: winnerBefore,
+    winnerEloAfter: winnerAfter,
+    loserEloBefore: loserBefore,
+    loserEloAfter: loserAfter,
+  };
+}
+
 /**
  * Elo ratings are derived fresh from full match history rather than stored
  * incrementally, so editing or undoing any past match (not just the latest)
@@ -70,23 +101,21 @@ export function computeEloRatings(players: Player[], matches: Match[]): Map<stri
   for (const p of players) ratings.set(p.id, STARTING_ELO);
 
   const ordered = [...matches].sort((a, b) => a.playedAt.localeCompare(b.playedAt));
-
-  for (const m of ordered) {
-    const winnerElo = ratings.get(m.winnerId) ?? STARTING_ELO;
-    const loserElo = ratings.get(m.loserId) ?? STARTING_ELO;
-
-    const expectedWinner = 1 / (1 + 10 ** ((loserElo - winnerElo) / 400));
-    const hasScore = m.winnerScore !== undefined && m.loserScore !== undefined;
-    const pointDiff = hasScore ? Math.abs(m.winnerScore! - m.loserScore!) : 0;
-    const movMultiplier = Math.min(MOV_CAP, 1 + pointDiff / 20);
-
-    const delta = ELO_K * (1 - expectedWinner) * movMultiplier;
-
-    ratings.set(m.winnerId, winnerElo + delta);
-    ratings.set(m.loserId, loserElo - delta);
-  }
+  for (const m of ordered) applyEloMatch(ratings, m);
 
   return ratings;
+}
+
+/** Per-match Elo before/after for both players, keyed by match id. */
+export function computeEloHistory(players: Player[], matches: Match[]): Map<string, EloMatchResult> {
+  const ratings = new Map<string, number>();
+  for (const p of players) ratings.set(p.id, STARTING_ELO);
+
+  const ordered = [...matches].sort((a, b) => a.playedAt.localeCompare(b.playedAt));
+  const history = new Map<string, EloMatchResult>();
+  for (const m of ordered) history.set(m.id, applyEloMatch(ratings, m));
+
+  return history;
 }
 
 export function eloFor(playerId: string, ratings: Map<string, number>): number {

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { INITIAL_PLAYERS, type Match, type Player } from "@/lib/types";
 import {
   avgPointDiff,
+  computeEloHistory,
   computeEloRatings,
   currentStreak,
   eloFor,
@@ -35,7 +36,6 @@ export default function Dashboard() {
   const [submitting, setSubmitting] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  const [newPlayerName, setNewPlayerName] = useState("");
   const [winnerId, setWinnerId] = useState("");
   const [loserId, setLoserId] = useState("");
   const [winnerScore, setWinnerScore] = useState("");
@@ -71,6 +71,7 @@ export default function Dashboard() {
   }, [players, winnerId, loserId]);
 
   const eloRatings = useMemo(() => computeEloRatings(players, matches), [players, matches]);
+  const eloHistory = useMemo(() => computeEloHistory(players, matches), [players, matches]);
   const sortedPlayers = useMemo(() => sortByElo(players, eloRatings), [players, eloRatings]);
 
   const recentMatches = useMemo(
@@ -94,32 +95,6 @@ export default function Dashboard() {
 
     return { hottest, coldest };
   }, [players, matches]);
-
-  async function handleAddPlayer(e: React.FormEvent) {
-    e.preventDefault();
-    const trimmed = newPlayerName.trim();
-    if (!trimmed) {
-      setError("Enter a name before adding a player.");
-      return;
-    }
-    setSubmitting(true);
-    setError("");
-    try {
-      const res = await fetch("/api/players", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: trimmed }),
-      });
-      if (!res.ok) throw new Error(await parseErrorMessage(res));
-      const data = (await res.json()) as { players: Player[] };
-      setPlayers(data.players);
-      setNewPlayerName("");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to add player.");
-    } finally {
-      setSubmitting(false);
-    }
-  }
 
   async function handleRecordMatch(e: React.FormEvent) {
     e.preventDefault();
@@ -334,30 +309,46 @@ export default function Dashboard() {
                       </p>
                     ) : (
                       <ul className="max-h-80 space-y-2 overflow-y-auto pr-1">
-                        {recentMatches.map((m) => (
-                          <li
-                            key={m.id}
-                            className="flex items-center justify-between rounded-lg bg-zinc-100 px-3 py-2 text-sm dark:bg-zinc-900"
-                          >
-                            <span>
-                              <span className="font-medium text-emerald-600 dark:text-emerald-400">
-                                {playerName(m.winnerId)}
-                              </span>{" "}
-                              beat{" "}
-                              <span className="font-medium text-rose-500 dark:text-rose-400">
-                                {playerName(m.loserId)}
-                              </span>
-                              {m.winnerScore !== undefined && m.loserScore !== undefined && (
-                                <span className="ml-1.5 text-zinc-400 dark:text-zinc-600">
-                                  {m.winnerScore}-{m.loserScore}
+                        {recentMatches.map((m) => {
+                          const eloChange = eloHistory.get(m.id);
+                          const delta = eloChange
+                            ? Math.round(eloChange.winnerEloAfter - eloChange.winnerEloBefore)
+                            : null;
+                          return (
+                            <li
+                              key={m.id}
+                              className="flex items-center justify-between rounded-lg bg-zinc-100 px-3 py-2 text-sm dark:bg-zinc-900"
+                            >
+                              <span>
+                                <span className="font-medium text-emerald-600 dark:text-emerald-400">
+                                  {playerName(m.winnerId)}
                                 </span>
-                              )}
-                            </span>
-                            <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                              {formatDate(m.playedAt)}
-                            </span>
-                          </li>
-                        ))}
+                                {delta !== null && (
+                                  <span className="ml-1 text-xs text-emerald-600/70 dark:text-emerald-400/70">
+                                    +{delta}
+                                  </span>
+                                )}{" "}
+                                beat{" "}
+                                <span className="font-medium text-rose-500 dark:text-rose-400">
+                                  {playerName(m.loserId)}
+                                </span>
+                                {delta !== null && (
+                                  <span className="ml-1 text-xs text-rose-500/70 dark:text-rose-400/70">
+                                    -{delta}
+                                  </span>
+                                )}
+                                {m.winnerScore !== undefined && m.loserScore !== undefined && (
+                                  <span className="ml-1.5 text-zinc-400 dark:text-zinc-600">
+                                    {m.winnerScore}-{m.loserScore}
+                                  </span>
+                                )}
+                              </span>
+                              <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                                {formatDate(m.playedAt)}
+                              </span>
+                            </li>
+                          );
+                        })}
                       </ul>
                     )}
                   </Card>
@@ -427,25 +418,6 @@ export default function Dashboard() {
                       className="mt-1 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {submitting ? "Saving…" : "Record Match"}
-                    </button>
-                  </form>
-                </Card>
-
-                <Card title="Add Player">
-                  <form onSubmit={handleAddPlayer} className="flex flex-col gap-3">
-                    <input
-                      type="text"
-                      value={newPlayerName}
-                      onChange={(e) => setNewPlayerName(e.target.value)}
-                      placeholder="Player name"
-                      className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm outline-none transition-colors focus:border-emerald-500 dark:border-zinc-700 dark:bg-zinc-900"
-                    />
-                    <button
-                      type="submit"
-                      disabled={submitting}
-                      className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium transition-colors hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:hover:bg-zinc-900"
-                    >
-                      {submitting ? "Saving…" : "Add Player"}
                     </button>
                   </form>
                 </Card>

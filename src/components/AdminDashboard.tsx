@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import type { Match, Player } from "@/lib/types";
-import { computeEloRatings, eloFor, sortByElo } from "@/lib/stats";
+import { computeEloHistory, computeEloRatings, eloFor, sortByElo } from "@/lib/stats";
 import { Card } from "@/components/ui";
 
 type AuthStatus = "checking" | "unauthenticated" | "authenticated";
@@ -91,6 +91,7 @@ export default function AdminDashboard() {
   }, [players]);
 
   const eloRatings = useMemo(() => computeEloRatings(players, matches), [players, matches]);
+  const eloHistory = useMemo(() => computeEloHistory(players, matches), [players, matches]);
   const sortedPlayers = useMemo(() => sortByElo(players, eloRatings), [players, eloRatings]);
   const recentMatches = useMemo(
     () => [...matches].sort((a, b) => b.playedAt.localeCompare(a.playedAt)),
@@ -474,13 +475,33 @@ export default function AdminDashboard() {
                         className="flex items-center justify-between gap-3 rounded-lg bg-zinc-100 px-3 py-2 text-sm dark:bg-zinc-900"
                       >
                         <span>
-                          <span className="font-medium text-emerald-600 dark:text-emerald-400">
-                            {playerName(m.winnerId)}
-                          </span>{" "}
-                          beat{" "}
-                          <span className="font-medium text-rose-500 dark:text-rose-400">
-                            {playerName(m.loserId)}
-                          </span>
+                          {(() => {
+                            const eloChange = eloHistory.get(m.id);
+                            const delta = eloChange
+                              ? Math.round(eloChange.winnerEloAfter - eloChange.winnerEloBefore)
+                              : null;
+                            return (
+                              <>
+                                <span className="font-medium text-emerald-600 dark:text-emerald-400">
+                                  {playerName(m.winnerId)}
+                                </span>
+                                {delta !== null && (
+                                  <span className="ml-1 text-xs text-emerald-600/70 dark:text-emerald-400/70">
+                                    +{delta}
+                                  </span>
+                                )}{" "}
+                                beat{" "}
+                                <span className="font-medium text-rose-500 dark:text-rose-400">
+                                  {playerName(m.loserId)}
+                                </span>
+                                {delta !== null && (
+                                  <span className="ml-1 text-xs text-rose-500/70 dark:text-rose-400/70">
+                                    -{delta}
+                                  </span>
+                                )}
+                              </>
+                            );
+                          })()}
                           {m.winnerScore !== undefined && m.loserScore !== undefined && (
                             <span className="ml-1.5 text-zinc-400 dark:text-zinc-600">
                               {m.winnerScore}-{m.loserScore}
