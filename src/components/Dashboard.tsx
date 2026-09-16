@@ -81,6 +81,9 @@ export default function Dashboard() {
 
   const playerName = (id: string) => players.find((p) => p.id === id)?.name ?? "Unknown";
 
+  const expandedPlayer = sortedPlayers.find((p) => p.id === expandedId) ?? null;
+  const expandedH2h = expandedPlayer ? headToHead(expandedPlayer.id, matches) : [];
+
   const { hottest, coldest } = useMemo(() => {
     const streaks = players
       .map((p) => ({ player: p, streak: currentStreak(p.id, matches) }))
@@ -173,8 +176,7 @@ export default function Dashboard() {
           <p className="text-sm text-zinc-500 dark:text-zinc-400">Loading leaderboard…</p>
         ) : (
           <>
-            <section className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-              <StatCard label="Players" value={players.length} />
+            <section className="mb-8 grid grid-cols-2 gap-3 lg:grid-cols-4">
               <StatCard label="Matches Played" value={totalMatches} />
               <StatCard
                 label="Top Player"
@@ -213,7 +215,6 @@ export default function Dashboard() {
                       <tbody>
                         {sortedPlayers.map((p, i) => {
                           const isExpanded = expandedId === p.id;
-                          const h2h = headToHead(p.id, matches);
                           return (
                             <Fragment key={p.id}>
                               <tr
@@ -259,46 +260,42 @@ export default function Dashboard() {
                                   <StreakBadge streak={currentStreak(p.id, matches)} />
                                 </td>
                               </tr>
-                              {isExpanded && (
-                                <tr className="border-b border-zinc-100 bg-zinc-50 dark:border-zinc-900 dark:bg-zinc-800/30">
-                                  <td colSpan={8} className="px-3 py-3">
-                                    <p className="mb-2 text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                                      {p.name}&apos;s head-to-head record
-                                    </p>
-                                    {h2h.length === 0 ? (
-                                      <p className="text-sm text-zinc-400 dark:text-zinc-600">
-                                        No matches recorded yet.
-                                      </p>
-                                    ) : (
-                                      <ul className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-                                        {h2h.map((rec) => (
-                                          <li
-                                            key={rec.opponentId}
-                                            className="flex items-center justify-between rounded-lg bg-white px-3 py-1.5 text-sm dark:bg-zinc-900"
-                                          >
-                                            <span>vs {playerName(rec.opponentId)}</span>
-                                            <span className="font-medium">
-                                              <span className="text-emerald-600 dark:text-emerald-400">
-                                                {rec.wins}
-                                              </span>
-                                              <span className="text-zinc-400 dark:text-zinc-600">-</span>
-                                              <span className="text-rose-500 dark:text-rose-400">
-                                                {rec.losses}
-                                              </span>
-                                            </span>
-                                          </li>
-                                        ))}
-                                      </ul>
-                                    )}
-                                  </td>
-                                </tr>
-                              )}
                             </Fragment>
                           );
                         })}
                       </tbody>
                     </table>
                   </div>
+                  {expandedPlayer && (
+                    <div className="mt-3 rounded-lg bg-zinc-50 p-3 dark:bg-zinc-800/30">
+                      <p className="mb-2 text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                        {expandedPlayer.name}&apos;s head-to-head record
+                      </p>
+                      {expandedH2h.length === 0 ? (
+                        <p className="text-sm text-zinc-400 dark:text-zinc-600">
+                          No matches recorded yet.
+                        </p>
+                      ) : (
+                        <ul className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                          {expandedH2h.map((rec) => (
+                            <li
+                              key={rec.opponentId}
+                              className="flex items-center justify-between rounded-lg bg-white px-3 py-1.5 text-sm dark:bg-zinc-900"
+                            >
+                              <span>vs {playerName(rec.opponentId)}</span>
+                              <span className="font-medium">
+                                <span className="text-emerald-600 dark:text-emerald-400">
+                                  {rec.wins}
+                                </span>
+                                <span className="text-zinc-400 dark:text-zinc-600">-</span>
+                                <span className="text-rose-500 dark:text-rose-400">{rec.losses}</span>
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  )}
                 </Card>
 
                 <div className="mt-6">
