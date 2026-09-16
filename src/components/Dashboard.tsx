@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { INITIAL_PLAYERS, type Match, type Player } from "@/lib/types";
 import {
@@ -80,9 +80,6 @@ export default function Dashboard() {
   );
 
   const playerName = (id: string) => players.find((p) => p.id === id)?.name ?? "Unknown";
-
-  const expandedPlayer = sortedPlayers.find((p) => p.id === expandedId) ?? null;
-  const expandedH2h = expandedPlayer ? headToHead(expandedPlayer.id, matches) : [];
 
   const { hottest, coldest } = useMemo(() => {
     const streaks = players
@@ -196,163 +193,91 @@ export default function Dashboard() {
             </section>
 
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-              <div className="lg:col-span-2">
+              <div className="order-1 lg:col-span-2 lg:col-start-1 lg:row-start-1">
                 <Card title="Power Rankings">
-                  <div className="overflow-x-auto">
-                    <table className="w-full min-w-[640px] border-collapse text-left text-sm">
-                      <thead>
-                        <tr className="border-b border-zinc-200 text-xs uppercase tracking-wide text-zinc-500 dark:border-zinc-800 dark:text-zinc-400">
-                          <th className="py-2 pr-2 font-medium">#</th>
-                          <th className="py-2 pr-2 font-medium">Player</th>
-                          <th className="py-2 pr-2 text-right font-medium">Elo</th>
-                          <th className="py-2 pr-2 text-right font-medium">Wins</th>
-                          <th className="py-2 pr-2 text-right font-medium">Losses</th>
-                          <th className="py-2 pr-2 text-right font-medium">Win %</th>
-                          <th className="py-2 pr-2 text-right font-medium">Avg Diff</th>
-                          <th className="py-2 pr-2 text-right font-medium">Streak</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {sortedPlayers.map((p, i) => {
-                          const isExpanded = expandedId === p.id;
-                          return (
-                            <Fragment key={p.id}>
-                              <tr
-                                onClick={() => setExpandedId(isExpanded ? null : p.id)}
-                                className="cursor-pointer border-b border-zinc-100 transition-colors last:border-0 hover:bg-zinc-50 dark:border-zinc-900 dark:hover:bg-zinc-800/50"
+                  <div className="divide-y divide-zinc-100 dark:divide-zinc-900">
+                    {sortedPlayers.map((p, i) => {
+                      const isExpanded = expandedId === p.id;
+                      const diff = avgPointDiff(p.id, matches);
+                      const h2h = headToHead(p.id, matches);
+                      return (
+                        <div key={p.id}>
+                          <button
+                            type="button"
+                            onClick={() => setExpandedId(isExpanded ? null : p.id)}
+                            className="flex w-full items-center justify-between gap-3 py-3 text-left transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
+                          >
+                            <span className="flex min-w-0 items-center gap-1.5">
+                              <span className="w-5 shrink-0 text-zinc-500 dark:text-zinc-400">
+                                {i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : i + 1}
+                              </span>
+                              <span
+                                className={
+                                  "shrink-0 text-zinc-400 transition-transform dark:text-zinc-600 " +
+                                  (isExpanded ? "rotate-90" : "")
+                                }
                               >
-                                <td className="py-3 pr-2 text-zinc-500 dark:text-zinc-400">
-                                  {i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : i + 1}
-                                </td>
-                                <td className="py-3 pr-2 font-medium">
-                                  <span className="inline-flex items-center gap-1.5">
-                                    <span
-                                      className={
-                                        "inline-block text-zinc-400 transition-transform dark:text-zinc-600 " +
-                                        (isExpanded ? "rotate-90" : "")
-                                      }
+                                ›
+                              </span>
+                              <span className="truncate font-medium">{p.name}</span>
+                            </span>
+                            <span className="flex shrink-0 items-center gap-3">
+                              <span className="font-semibold">{eloFor(p.id, eloRatings)}</span>
+                              <StreakBadge streak={currentStreak(p.id, matches)} />
+                            </span>
+                          </button>
+                          <div className="flex flex-wrap gap-x-3 gap-y-1 pb-3 pl-[1.75rem] text-xs text-zinc-500 dark:text-zinc-400">
+                            <span>
+                              <span className="text-emerald-600 dark:text-emerald-400">{p.wins}W</span>{" "}
+                              <span className="text-rose-500 dark:text-rose-400">{p.losses}L</span>
+                            </span>
+                            <span>
+                              {p.wins + p.losses === 0 ? "—" : `${winPct(p).toFixed(0)}%`} win rate
+                            </span>
+                            <span>
+                              {diff === null ? "—" : `${diff > 0 ? "+" : ""}${diff.toFixed(1)}`} avg diff
+                            </span>
+                          </div>
+                          {isExpanded && (
+                            <div className="mb-3 rounded-lg bg-zinc-50 p-3 dark:bg-zinc-800/30">
+                              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                                {p.name}&apos;s head-to-head record
+                              </p>
+                              {h2h.length === 0 ? (
+                                <p className="text-sm text-zinc-400 dark:text-zinc-600">
+                                  No matches recorded yet.
+                                </p>
+                              ) : (
+                                <ul className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                                  {h2h.map((rec) => (
+                                    <li
+                                      key={rec.opponentId}
+                                      className="flex items-center justify-between rounded-lg bg-white px-3 py-1.5 text-sm dark:bg-zinc-900"
                                     >
-                                      ›
-                                    </span>
-                                    {p.name}
-                                  </span>
-                                </td>
-                                <td className="py-3 pr-2 text-right font-semibold">
-                                  {eloFor(p.id, eloRatings)}
-                                </td>
-                                <td className="py-3 pr-2 text-right text-emerald-600 dark:text-emerald-400">
-                                  {p.wins}
-                                </td>
-                                <td className="py-3 pr-2 text-right text-rose-500 dark:text-rose-400">
-                                  {p.losses}
-                                </td>
-                                <td className="py-3 pr-2 text-right text-zinc-500 dark:text-zinc-400">
-                                  {p.wins + p.losses === 0 ? "—" : `${winPct(p).toFixed(0)}%`}
-                                </td>
-                                <td className="py-3 pr-2 text-right text-zinc-500 dark:text-zinc-400">
-                                  {(() => {
-                                    const diff = avgPointDiff(p.id, matches);
-                                    if (diff === null) return "—";
-                                    return `${diff > 0 ? "+" : ""}${diff.toFixed(1)}`;
-                                  })()}
-                                </td>
-                                <td className="py-3 pr-2 text-right">
-                                  <StreakBadge streak={currentStreak(p.id, matches)} />
-                                </td>
-                              </tr>
-                            </Fragment>
-                          );
-                        })}
-                      </tbody>
-                    </table>
+                                      <span>vs {playerName(rec.opponentId)}</span>
+                                      <span className="font-medium">
+                                        <span className="text-emerald-600 dark:text-emerald-400">
+                                          {rec.wins}
+                                        </span>
+                                        <span className="text-zinc-400 dark:text-zinc-600">-</span>
+                                        <span className="text-rose-500 dark:text-rose-400">
+                                          {rec.losses}
+                                        </span>
+                                      </span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
-                  {expandedPlayer && (
-                    <div className="mt-3 rounded-lg bg-zinc-50 p-3 dark:bg-zinc-800/30">
-                      <p className="mb-2 text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                        {expandedPlayer.name}&apos;s head-to-head record
-                      </p>
-                      {expandedH2h.length === 0 ? (
-                        <p className="text-sm text-zinc-400 dark:text-zinc-600">
-                          No matches recorded yet.
-                        </p>
-                      ) : (
-                        <ul className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-                          {expandedH2h.map((rec) => (
-                            <li
-                              key={rec.opponentId}
-                              className="flex items-center justify-between rounded-lg bg-white px-3 py-1.5 text-sm dark:bg-zinc-900"
-                            >
-                              <span>vs {playerName(rec.opponentId)}</span>
-                              <span className="font-medium">
-                                <span className="text-emerald-600 dark:text-emerald-400">
-                                  {rec.wins}
-                                </span>
-                                <span className="text-zinc-400 dark:text-zinc-600">-</span>
-                                <span className="text-rose-500 dark:text-rose-400">{rec.losses}</span>
-                              </span>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
-                  )}
                 </Card>
-
-                <div className="mt-6">
-                  <Card title="Match History">
-                    {recentMatches.length === 0 ? (
-                      <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                        No matches recorded yet. Record one to get started.
-                      </p>
-                    ) : (
-                      <ul className="max-h-80 space-y-2 overflow-y-auto pr-1">
-                        {recentMatches.map((m) => {
-                          const eloChange = eloHistory.get(m.id);
-                          const delta = eloChange
-                            ? Math.round(eloChange.winnerEloAfter - eloChange.winnerEloBefore)
-                            : null;
-                          return (
-                            <li
-                              key={m.id}
-                              className="flex items-center justify-between rounded-lg bg-zinc-100 px-3 py-2 text-sm dark:bg-zinc-900"
-                            >
-                              <span>
-                                <span className="font-medium text-emerald-600 dark:text-emerald-400">
-                                  {playerName(m.winnerId)}
-                                </span>
-                                {delta !== null && (
-                                  <span className="ml-1 text-xs text-emerald-600/70 dark:text-emerald-400/70">
-                                    +{delta}
-                                  </span>
-                                )}{" "}
-                                beat{" "}
-                                <span className="font-medium text-rose-500 dark:text-rose-400">
-                                  {playerName(m.loserId)}
-                                </span>
-                                {delta !== null && (
-                                  <span className="ml-1 text-xs text-rose-500/70 dark:text-rose-400/70">
-                                    -{delta}
-                                  </span>
-                                )}
-                                {m.winnerScore !== undefined && m.loserScore !== undefined && (
-                                  <span className="ml-1.5 text-zinc-400 dark:text-zinc-600">
-                                    {m.winnerScore}-{m.loserScore}
-                                  </span>
-                                )}
-                              </span>
-                              <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                                {formatDate(m.playedAt)}
-                              </span>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    )}
-                  </Card>
-                </div>
               </div>
 
-              <div className="flex flex-col gap-6">
+              <div className="order-2 lg:col-start-3 lg:row-start-1">
                 <Card title="Record a Match">
                   <form onSubmit={handleRecordMatch} className="flex flex-col gap-3">
                     <label className="flex flex-col gap-1 text-sm">
@@ -418,13 +343,68 @@ export default function Dashboard() {
                     </button>
                   </form>
                 </Card>
+              </div>
 
-                {error && (
+              <div className="order-3 lg:col-span-2 lg:col-start-1 lg:row-start-2">
+                <Card title="Match History">
+                  {recentMatches.length === 0 ? (
+                    <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                      No matches recorded yet. Record one to get started.
+                    </p>
+                  ) : (
+                    <ul className="max-h-80 space-y-2 overflow-y-auto pr-1">
+                      {recentMatches.map((m) => {
+                        const eloChange = eloHistory.get(m.id);
+                        const delta = eloChange
+                          ? Math.round(eloChange.winnerEloAfter - eloChange.winnerEloBefore)
+                          : null;
+                        return (
+                          <li
+                            key={m.id}
+                            className="flex items-center justify-between rounded-lg bg-zinc-100 px-3 py-2 text-sm dark:bg-zinc-900"
+                          >
+                            <span>
+                              <span className="font-medium text-emerald-600 dark:text-emerald-400">
+                                {playerName(m.winnerId)}
+                              </span>
+                              {delta !== null && (
+                                <span className="ml-1 text-xs text-emerald-600/70 dark:text-emerald-400/70">
+                                  +{delta}
+                                </span>
+                              )}{" "}
+                              beat{" "}
+                              <span className="font-medium text-rose-500 dark:text-rose-400">
+                                {playerName(m.loserId)}
+                              </span>
+                              {delta !== null && (
+                                <span className="ml-1 text-xs text-rose-500/70 dark:text-rose-400/70">
+                                  -{delta}
+                                </span>
+                              )}
+                              {m.winnerScore !== undefined && m.loserScore !== undefined && (
+                                <span className="ml-1.5 text-zinc-400 dark:text-zinc-600">
+                                  {m.winnerScore}-{m.loserScore}
+                                </span>
+                              )}
+                            </span>
+                            <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                              {formatDate(m.playedAt)}
+                            </span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </Card>
+              </div>
+
+              {error && (
+                <div className="order-4 lg:col-start-3 lg:row-start-2">
                   <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-600 dark:bg-rose-950 dark:text-rose-400">
                     {error}
                   </p>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           </>
         )}
