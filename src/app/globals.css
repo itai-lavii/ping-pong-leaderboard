@@ -1,26 +1,378 @@
 @import "tailwindcss";
 
+/*
+ * Clean neutrals, one ping-pong-ball orange accent, green/red for results.
+ * Use the semantic utilities (`bg-surface`, `text-muted`, `text-acc`, …)
+ * rather than raw colors so both themes stay in sync.
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --bg: #f4f4f2;
+  --surface: #ffffff;
+  --subtle: #f2f1ee;
+  --line: rgba(17, 17, 16, 0.08);
+  --fg: #111110;
+  --muted: #6b6a64;
+  --faint: #b3b2ac;
+  --acc: #c2410c;
+  --ball: #ff6b1a;
+  --win: #15803d;
+  --loss: #dc2626;
+  --shadow: 0 1px 2px rgba(17, 17, 16, 0.04), 0 16px 40px -24px rgba(17, 17, 16, 0.22);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --bg: #0e0e0f;
+    --surface: #18181a;
+    --subtle: #232325;
+    --line: rgba(247, 247, 245, 0.07);
+    --fg: #f7f7f5;
+    --muted: #a1a09b;
+    --faint: #5c5b57;
+    --acc: #ff7a3d;
+    --ball: #ff7a3d;
+    --win: #4ade80;
+    --loss: #ff6b6b;
+    --shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 20px 40px -24px rgba(0, 0, 0, 0.8);
   }
 }
 
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-subtle: var(--subtle);
+  --color-line: var(--line);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-acc: var(--acc);
+  --color-ball: var(--ball);
+  --color-win: var(--win);
+  --color-loss: var(--loss);
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-cormorant), Georgia, serif;
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+}
+
+/* ---------- motion ---------- */
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+}
+
+@keyframes grow-up {
+  from {
+    transform: scaleY(0);
+  }
+}
+
+@keyframes pop-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* ---------- celebration ----------
+   Timeline is a percentage of the rally: returns at 0/28/50/68%, each faster
+   and flatter; the winner smashes at 82% and the fireball crosses the middle
+   at ~90%, which is when the impact (flash, shake, reveal) fires. */
+
+@keyframes rally-x {
+  0% { left: 18%; }
+  28% { left: 82%; }
+  50% { left: 18%; }
+  68% { left: 82%; }
+  82% { left: 18%; }
+  100% { left: 118%; }
+}
+
+@keyframes rally-y {
+  0% { top: 62%; animation-timing-function: cubic-bezier(0.3, 0.6, 0.6, 1); }
+  14% { top: 8%; animation-timing-function: cubic-bezier(0.4, 0, 0.7, 0.4); }
+  28% { top: 62%; animation-timing-function: cubic-bezier(0.3, 0.6, 0.6, 1); }
+  39% { top: 16%; animation-timing-function: cubic-bezier(0.4, 0, 0.7, 0.4); }
+  50% { top: 62%; animation-timing-function: cubic-bezier(0.3, 0.6, 0.6, 1); }
+  59% { top: 26%; animation-timing-function: cubic-bezier(0.4, 0, 0.7, 0.4); }
+  68% { top: 62%; animation-timing-function: cubic-bezier(0.3, 0.6, 0.6, 1); }
+  75% { top: 34%; animation-timing-function: cubic-bezier(0.4, 0, 0.7, 0.4); }
+  82% { top: 62%; animation-timing-function: linear; }
+  100% { top: 40%; }
+}
+
+@keyframes rally-fire {
+  0%, 80% {
+    background: #fff;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+    transform: scale(1);
+  }
+  84%, 100% {
+    background: #ffe066;
+    box-shadow: 0 0 8px 3px #ffa94d, 0 0 22px 10px #ff6b1a, 0 0 44px 18px rgba(255, 60, 0, 0.55);
+    transform: scale(1.6);
+  }
+}
+
+@keyframes rally-trail {
+  0%, 81% { opacity: 0; }
+  84%, 100% { opacity: var(--o); }
+}
+
+@keyframes swing-l {
+  0% { transform: rotate(18deg); }
+  12% { transform: rotate(-20deg); }
+  50% { transform: rotate(18deg); }
+  60% { transform: rotate(-20deg); }
+  75% { transform: rotate(-55deg); }
+  82% { transform: rotate(42deg); }
+  100% { transform: rotate(30deg); }
+}
+
+/* Runs inside a mirrored wrapper, so negative angles swing it backwards. */
+@keyframes swing-r {
+  0%, 20% { transform: rotate(-20deg); }
+  28% { transform: rotate(18deg); }
+  40%, 60% { transform: rotate(-20deg); }
+  68% { transform: rotate(18deg); }
+  78%, 88% { transform: rotate(-20deg); }
+  92% { transform: rotate(-80deg) translateY(-6px); }
+  100% { transform: rotate(-62deg); }
+}
+
+/* paddles get blown out of frame by the impact (translate, so the swing's
+   transform keeps running) */
+@keyframes exit-l {
+  to { translate: -90px 30px; opacity: 0; }
+}
+
+@keyframes exit-r {
+  to { translate: 90px 30px; opacity: 0; }
+}
+
+@keyframes shake {
+  0%, 100% { translate: 0 0; }
+  10% { translate: -10px 5px; }
+  20% { translate: 9px -7px; }
+  30% { translate: -7px -4px; }
+  40% { translate: 6px 6px; }
+  55% { translate: -4px 2px; }
+  70% { translate: 3px -2px; }
+  85% { translate: -1px 1px; }
+}
+
+@keyframes flash {
+  0% { opacity: 0; }
+  12% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@keyframes shockwave {
+  from { transform: scale(0.2); opacity: 0.9; }
+  to { transform: scale(3.4); opacity: 0; }
+}
+
+@keyframes slam {
+  0% { opacity: 0; transform: scale(2.6) rotate(-10deg); }
+  55% { opacity: 1; transform: scale(0.9) rotate(3deg); }
+  75% { transform: scale(1.07) rotate(-1deg); }
+  100% { opacity: 1; transform: scale(1) rotate(0); }
+}
+
+@keyframes flame-in {
+  from { transform: scaleY(0); opacity: 0; }
+}
+
+@keyframes flicker {
+  0%, 100% { transform: scaleY(1) skewX(0deg); }
+  25% { transform: scaleY(1.14) skewX(4deg); }
+  50% { transform: scaleY(0.9) skewX(-3deg); }
+  75% { transform: scaleY(1.07) skewX(2deg); }
+}
+
+@keyframes ember {
+  from { transform: translate(0, 0) scale(1); opacity: 1; }
+  to { transform: translate(var(--ex), -150px) scale(0.3); opacity: 0; }
+}
+
+@keyframes glow-in {
+  from { opacity: 0; }
+}
+
+@keyframes confetti {
+  0% {
+    opacity: 1;
+    transform: translate(0, 0) rotate(var(--cr));
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--cx), var(--cy)) rotate(var(--cr));
+  }
+}
+
+.fire-text {
+  background: linear-gradient(180deg, #ffe066 0%, #ff922b 45%, #f03e3e 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+@layer components {
+  .card {
+    border-radius: 1.5rem;
+    background-color: var(--surface);
+    box-shadow: var(--shadow);
+  }
+
+  /* Staggered fade-up on load: set --d for the delay. */
+  .rise {
+    animation: rise 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation-delay: var(--d, 0s);
+  }
+
+  .grow-up {
+    transform-origin: bottom;
+    animation: grow-up 0.9s cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation-delay: var(--d, 0s);
+  }
+
+  .pop-in {
+    animation: pop-in 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    animation-delay: var(--d, 0s);
+  }
+
+  .hover-bob:hover .bob-target,
+  .bob {
+    animation: bob 1.4s ease-in-out infinite;
+  }
+
+  .numeral {
+    font-family: var(--font-cormorant), Georgia, serif;
+    font-variant-numeric: lining-nums tabular-nums;
+  }
+
+  .eyebrow {
+    font-size: 0.6875rem;
+    font-weight: 500;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .field {
+    height: 2.75rem;
+    width: 100%;
+    border-radius: 0.875rem;
+    border: 1px solid transparent;
+    background-color: var(--subtle);
+    padding: 0 0.95rem;
+    font-size: 0.9375rem;
+    color: var(--fg);
+    outline: none;
+    transition: border-color 160ms, box-shadow 160ms, background-color 160ms;
+  }
+  .field::placeholder {
+    color: var(--faint);
+  }
+  .field:focus {
+    background-color: var(--surface);
+    border-color: color-mix(in srgb, var(--ball) 60%, transparent);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--ball) 16%, transparent);
+  }
+  select.field {
+    appearance: none;
+    cursor: pointer;
+    padding-right: 2.25rem;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b6a64' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.95rem center;
+  }
+  input.field[type="number"] {
+    font-variant-numeric: tabular-nums;
+    -moz-appearance: textfield;
+  }
+  input.field[type="number"]::-webkit-inner-spin-button,
+  input.field[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  .btn {
+    display: inline-flex;
+    height: 2.75rem;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: 0.875rem;
+    padding: 0 1.1rem;
+    font-size: 0.9375rem;
+    font-weight: 500;
+    transition: background-color 160ms, opacity 160ms, transform 160ms;
+  }
+  .btn:active:not(:disabled) {
+    transform: scale(0.98);
+  }
+  .btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+  .btn-primary {
+    background-color: var(--fg);
+    color: var(--bg);
+  }
+  .btn-primary:hover:not(:disabled) {
+    opacity: 0.88;
+  }
+  .btn-secondary {
+    background-color: var(--subtle);
+    color: var(--fg);
+  }
+  .btn-secondary:hover:not(:disabled) {
+    background-color: color-mix(in srgb, var(--subtle) 88%, var(--fg) 12%);
+  }
+  .btn-sm {
+    height: 2rem;
+    border-radius: 0.625rem;
+    padding: 0 0.75rem;
+    font-size: 0.8125rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
 }

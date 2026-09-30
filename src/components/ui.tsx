@@ -1,71 +1,78 @@
 import { formatDate } from "@/lib/format";
 
-export function StatCard({
-  label,
-  value,
-  accent,
-}: {
-  label: string;
-  value: string | number;
-  accent?: "emerald" | "rose";
-}) {
-  return (
-    <div className="rounded-xl border border-zinc-200 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900">
-      <p className="text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400">{label}</p>
-      <p
-        className={
-          "mt-1 truncate text-xl font-semibold " +
-          (accent === "emerald"
-            ? "text-emerald-600 dark:text-emerald-400"
-            : accent === "rose"
-              ? "text-rose-500 dark:text-rose-400"
-              : "")
-        }
-      >
-        {value}
-      </p>
-    </div>
-  );
-}
-
 export function Card({
   title,
+  description,
   action,
+  flush = false,
+  delay,
   children,
 }: {
   title: string;
+  description?: React.ReactNode;
   action?: React.ReactNode;
+  /** Drop body side padding so rows can run edge to edge. */
+  flush?: boolean;
+  /** Fade-up delay in seconds. */
+  delay?: number;
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
-      <div className="mb-4 flex items-center justify-between gap-2">
-        <h2 className="text-lg font-semibold">{title}</h2>
+    <section
+      className="card rise overflow-hidden"
+      style={delay !== undefined ? ({ "--d": `${delay}s` } as React.CSSProperties) : undefined}
+    >
+      <header className="flex items-end justify-between gap-3 px-6 pb-4 pt-6">
+        <div className="min-w-0">
+          <h2 className="font-serif text-[1.65rem] font-medium leading-none tracking-tight">{title}</h2>
+          {description && <p className="mt-2 text-[13px] text-muted">{description}</p>}
+        </div>
         {action}
+      </header>
+      <div className={flush ? "pb-2" : "px-6 pb-6"}>{children}</div>
+    </section>
+  );
+}
+
+export function Stat({
+  label,
+  value,
+  detail,
+  delay,
+}: {
+  label: string;
+  value: React.ReactNode;
+  detail?: React.ReactNode;
+  delay?: number;
+}) {
+  return (
+    <div
+      className="card rise flex h-full min-w-0 flex-col justify-between gap-4 px-5 py-5 sm:px-6"
+      style={delay !== undefined ? ({ "--d": `${delay}s` } as React.CSSProperties) : undefined}
+    >
+      <p className="eyebrow">{label}</p>
+      <div className="min-w-0">
+        <p className="numeral truncate text-[2rem] font-medium leading-none tracking-tight">{value}</p>
+        {detail && <p className="mt-2 line-clamp-2 text-[13px] leading-snug text-muted">{detail}</p>}
       </div>
-      {children}
     </div>
   );
 }
 
-export function StreakBadge({ streak }: { streak: { type: "W" | "L"; count: number } | null }) {
+export function Streak({ streak }: { streak: { type: "W" | "L"; count: number } | null }) {
   if (!streak || streak.count === 0) {
-    return <span className="text-zinc-400 dark:text-zinc-600">—</span>;
+    return <span className="text-faint">—</span>;
   }
-  const isWin = streak.type === "W";
   return (
-    <span
-      className={
-        "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold " +
-        (isWin
-          ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400"
-          : "bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-400")
-      }
-    >
+    <span className={"tabular-nums " + (streak.type === "W" ? "text-win" : "text-loss")}>
       {streak.type}
       {streak.count}
     </span>
   );
+}
+
+export function EmptyState({ children }: { children: React.ReactNode }) {
+  return <p className="px-6 py-10 text-center font-serif text-lg italic text-muted">{children}</p>;
 }
 
 export function MatchRow({
@@ -75,33 +82,46 @@ export function MatchRow({
   loserScore,
   playedAt,
   delta,
+  avatar,
 }: {
+  avatar?: React.ReactNode;
   winnerName: string;
   loserName: string;
   winnerScore?: number;
   loserScore?: number;
   playedAt: string;
-  delta: number | null;
+  /** Winner's gain and loser's loss; they differ when a season pays winners extra. */
+  delta: { gain: number; loss: number } | null;
 }) {
   return (
-    <li className="flex items-center justify-between rounded-lg bg-zinc-100 px-3 py-2 text-sm dark:bg-zinc-900">
-      <span>
-        <span className="font-medium text-emerald-600 dark:text-emerald-400">{winnerName}</span>
+    <li className="mx-2 flex items-center justify-between gap-3 rounded-2xl px-4 py-3 text-sm transition-colors hover:bg-subtle/60">
+      {avatar}
+      <div className="min-w-0 flex-1">
+        <p className="truncate">
+          <span className="font-medium">{winnerName}</span>
+          <span className="font-serif italic text-muted"> over </span>
+          <span>{loserName}</span>
+        </p>
+        <p className="mt-0.5 text-xs text-muted">{formatDate(playedAt)}</p>
+      </div>
+      <div className="flex shrink-0 items-baseline gap-3">
         {delta !== null && (
-          <span className="ml-1 text-xs text-emerald-600/70 dark:text-emerald-400/70">+{delta}</span>
-        )}{" "}
-        beat{" "}
-        <span className="font-medium text-rose-500 dark:text-rose-400">{loserName}</span>
-        {delta !== null && (
-          <span className="ml-1 text-xs text-rose-500/70 dark:text-rose-400/70">-{delta}</span>
-        )}
-        {winnerScore !== undefined && loserScore !== undefined && (
-          <span className="ml-1.5 text-zinc-400 dark:text-zinc-600">
-            {winnerScore}-{loserScore}
+          <span className="text-xs text-muted tabular-nums">
+            {delta.gain === delta.loss ? (
+              `±${delta.gain}`
+            ) : (
+              <>
+                <span className="text-win">+{delta.gain}</span> <span className="text-loss">−{delta.loss}</span>
+              </>
+            )}
           </span>
         )}
-      </span>
-      <span className="text-xs text-zinc-500 dark:text-zinc-400">{formatDate(playedAt)}</span>
+        {winnerScore !== undefined && loserScore !== undefined && (
+          <span className="numeral w-16 text-right text-xl font-medium">
+            {winnerScore}–{loserScore}
+          </span>
+        )}
+      </div>
     </li>
   );
 }

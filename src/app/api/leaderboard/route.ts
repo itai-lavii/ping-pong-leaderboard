@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
-import { getMatches, getPlayers } from "@/lib/kv";
+import { getAvatars, getMatches, getPlayers } from "@/lib/kv";
 
 export async function GET() {
   try {
-    const [players, matches] = await Promise.all([getPlayers(), getMatches()]);
-    return NextResponse.json({ players, matches });
+    const [players, matches, avatars] = await Promise.all([getPlayers(), getMatches(), getAvatars()]);
+    return NextResponse.json({ players, matches, avatars });
   } catch (error) {
     console.error("Failed to load leaderboard from KV:", error);
     return NextResponse.json(

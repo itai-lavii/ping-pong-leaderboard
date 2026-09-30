@@ -55,6 +55,18 @@ export function headToHead(playerId: string, matches: Match[]): HeadToHeadRecord
 }
 
 export const STARTING_ELO = 1500;
+
+/**
+ * How a leaderboard scores matches. Classic Elo is zero-sum: the winner gains
+ * exactly what the loser drops. A `winMultiplier` above 1 scales only the
+ * winner's gain — the loser still loses the normal amount.
+ */
+export interface EloRules {
+  start: number;
+  winMultiplier: number;
+}
+
+export const CLASSIC_RULES: EloRules = { start: STARTING_ELO, winMultiplier: 1 };
 export const ELO_K = 32;
 // Margin-of-victory multiplier, per (score diff / 20) + 1, capped so a single
 // blowout game can't swing a rating too far (a 21-5 game lands right at 1.8x).
@@ -89,12 +101,12 @@ export interface EloMatchResult {
   loserEloAfter: number;
 }
 
-function applyEloMatch(ratings: Map<string, number>, m: Match): EloMatchResult {
-  const winnerBefore = ratings.get(m.winnerId) ?? STARTING_ELO;
-  const loserBefore = ratings.get(m.loserId) ?? STARTING_ELO;
+function applyEloMatch(ratings: Map<string, number>, m: Match, rules: EloRules): EloMatchResult {
+  const winnerBefore = ratings.get(m.winnerId) ?? rules.start;
+  const loserBefore = ratings.get(m.loserId) ?? rules.start;
 
   const delta = eloDelta(winnerBefore, loserBefore, m.winnerScore, m.loserScore);
-  const winnerAfter = winnerBefore + delta;
+  const winnerAfter = winnerBefore + delta * rules.winMultiplier;
   const loserAfter = loserBefore - delta;
 
   ratings.set(m.winnerId, winnerAfter);
@@ -113,24 +125,32 @@ function applyEloMatch(ratings: Map<string, number>, m: Match): EloMatchResult {
  * incrementally, so editing or undoing any past match (not just the latest)
  * stays correct automatically.
  */
-export function computeEloRatings(players: Player[], matches: Match[]): Map<string, number> {
+export function computeEloRatings(
+  players: Player[],
+  matches: Match[],
+  rules: EloRules = CLASSIC_RULES
+): Map<string, number> {
   const ratings = new Map<string, number>();
-  for (const p of players) ratings.set(p.id, STARTING_ELO);
+  for (const p of players) ratings.set(p.id, rules.start);
 
   const ordered = [...matches].sort((a, b) => a.playedAt.localeCompare(b.playedAt));
-  for (const m of ordered) applyEloMatch(ratings, m);
+  for (const m of ordered) applyEloMatch(ratings, m, rules);
 
   return ratings;
 }
 
 /** Per-match Elo before/after for both players, keyed by match id. */
-export function computeEloHistory(players: Player[], matches: Match[]): Map<string, EloMatchResult> {
+export function computeEloHistory(
+  players: Player[],
+  matches: Match[],
+  rules: EloRules = CLASSIC_RULES
+): Map<string, EloMatchResult> {
   const ratings = new Map<string, number>();
-  for (const p of players) ratings.set(p.id, STARTING_ELO);
+  for (const p of players) ratings.set(p.id, rules.start);
 
   const ordered = [...matches].sort((a, b) => a.playedAt.localeCompare(b.playedAt));
   const history = new Map<string, EloMatchResult>();
-  for (const m of ordered) history.set(m.id, applyEloMatch(ratings, m));
+  for (const m of ordered) history.set(m.id, applyEloMatch(ratings, m, rules));
 
   return history;
 }

@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import type { Match, Player } from "@/lib/types";
 import { computeEloHistory, computeEloRatings, eloFor, sortByElo } from "@/lib/stats";
 import { formatDate } from "@/lib/format";
@@ -236,18 +235,18 @@ export default function AdminDashboard() {
 
   if (authStatus === "checking") {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-zinc-950">
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">Checking session…</p>
-      </div>
+      <main className="mx-auto w-full max-w-4xl px-4 py-10 sm:px-6">
+        <p className="text-sm text-muted">Checking session…</p>
+      </main>
     );
   }
 
   if (authStatus === "unauthenticated") {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-zinc-50 px-4 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-50">
-        <div className="w-full max-w-sm rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
-          <h1 className="mb-1 text-xl font-semibold">Admin Access</h1>
-          <p className="mb-4 text-sm text-zinc-500 dark:text-zinc-400">
+      <main className="flex flex-1 items-start justify-center px-4 py-16 sm:py-24">
+        <div className="w-full max-w-sm rounded-xl border border-line bg-surface p-6">
+          <h1 className="mb-1 text-lg font-semibold">Admin access</h1>
+          <p className="mb-5 text-sm text-muted">
             Enter the admin passcode to manage records.
           </p>
           <form onSubmit={handleLogin} className="flex flex-col gap-3">
@@ -257,71 +256,53 @@ export default function AdminDashboard() {
               onChange={(e) => setPasscode(e.target.value)}
               placeholder="Passcode"
               autoFocus
-              className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm outline-none transition-colors focus:border-emerald-500 dark:border-zinc-700 dark:bg-zinc-950"
+              className="field"
             />
             <button
               type="submit"
               disabled={loggingIn}
-              className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+              className="btn btn-primary"
             >
               {loggingIn ? "Checking…" : "Enter"}
             </button>
             {loginError && (
-              <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-600 dark:bg-rose-950 dark:text-rose-400">
+              <p className="text-sm text-loss">
                 {loginError}
               </p>
             )}
           </form>
-          <Link
-            href="/"
-            className="mt-4 inline-block text-sm text-zinc-500 hover:text-zinc-700 dark:text-zinc-500 dark:hover:text-zinc-300"
-          >
-            ← Back to leaderboard
-          </Link>
         </div>
-      </div>
+      </main>
     );
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-50">
-      <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6 lg:px-8">
+    <main className="mx-auto w-full max-w-4xl px-4 py-8 sm:px-6 sm:py-10">
         <header className="mb-8 flex items-start justify-between gap-4">
-          <div className="flex flex-col gap-1">
-            <p className="text-sm font-medium uppercase tracking-widest text-emerald-600 dark:text-emerald-400">
-              Admin
-            </p>
-            <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Manage Leaderboard</h1>
-            <Link
-              href="/"
-              className="text-sm text-zinc-500 hover:text-zinc-700 dark:text-zinc-500 dark:hover:text-zinc-300"
-            >
-              ← Back to leaderboard
-            </Link>
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Manage leaderboard</h1>
+            <p className="mt-1 text-sm text-muted">Edit records, fix or undo matches.</p>
           </div>
-          <button
-            onClick={handleLogout}
-            className="mt-1 shrink-0 rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-500 transition-colors hover:border-zinc-300 hover:text-zinc-700 dark:border-zinc-800 dark:text-zinc-500 dark:hover:border-zinc-700 dark:hover:text-zinc-300"
-          >
+          <button onClick={handleLogout} className="btn btn-secondary btn-sm shrink-0">
             Log out
           </button>
         </header>
 
         {loading ? (
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">Loading…</p>
+          <p className="text-sm text-muted">Loading…</p>
         ) : (
           <div className="flex flex-col gap-6">
             {error && (
-              <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-600 dark:bg-rose-950 dark:text-rose-400">
+              <p className="text-sm text-loss">
                 {error}
               </p>
             )}
 
-            <Card title="Edit Records">
+            <Card title="Records" description="Stored all-time wins and losses. Elo is always recalculated from matches." flush>
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[420px] border-collapse text-left text-sm">
+                <table className="w-full min-w-[420px] border-collapse text-left text-sm tabular-nums [&_td:first-child]:pl-5 [&_td:last-child]:pr-5 [&_td]:py-2.5 [&_th:first-child]:pl-5 [&_th:last-child]:pr-5 [&_th]:py-2.5">
                   <thead>
-                    <tr className="border-b border-zinc-200 text-xs uppercase tracking-wide text-zinc-500 dark:border-zinc-800 dark:text-zinc-400">
+                    <tr className="border-b border-line bg-subtle text-xs text-muted">
                       <th className="py-2 pr-2 font-medium">Player</th>
                       <th className="py-2 pr-2 font-medium">Elo</th>
                       <th className="py-2 pr-2 font-medium">Wins</th>
@@ -331,9 +312,9 @@ export default function AdminDashboard() {
                   </thead>
                   <tbody>
                     {sortedPlayers.map((p) => (
-                      <tr key={p.id} className="border-b border-zinc-100 last:border-0 dark:border-zinc-900">
+                      <tr key={p.id} className="border-b border-line last:border-0">
                         <td className="py-2 pr-2 font-medium">{p.name}</td>
-                        <td className="py-2 pr-2 text-zinc-500 dark:text-zinc-400">
+                        <td className="py-2 pr-2 text-muted">
                           {eloFor(p.id, eloRatings)}
                         </td>
                         <td className="py-2 pr-2">
@@ -347,7 +328,7 @@ export default function AdminDashboard() {
                                 [p.id]: { ...prev[p.id], wins: e.target.value, losses: prev[p.id]?.losses ?? String(p.losses) },
                               }))
                             }
-                            className="w-20 rounded-lg border border-zinc-300 bg-white px-2 py-1 text-sm outline-none focus:border-emerald-500 dark:border-zinc-700 dark:bg-zinc-950"
+                            className="field w-20"
                           />
                         </td>
                         <td className="py-2 pr-2">
@@ -361,14 +342,14 @@ export default function AdminDashboard() {
                                 [p.id]: { ...prev[p.id], losses: e.target.value, wins: prev[p.id]?.wins ?? String(p.wins) },
                               }))
                             }
-                            className="w-20 rounded-lg border border-zinc-300 bg-white px-2 py-1 text-sm outline-none focus:border-emerald-500 dark:border-zinc-700 dark:bg-zinc-950"
+                            className="field w-20"
                           />
                         </td>
                         <td className="py-2 pr-2 text-right">
                           <button
                             onClick={() => handleSaveRecord(p.id)}
                             disabled={savingId === p.id}
-                            className="rounded-lg border border-zinc-300 px-3 py-1 text-xs font-medium transition-colors hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:hover:bg-zinc-900"
+                            className="btn btn-secondary btn-sm"
                           >
                             {savingId === p.id ? "Saving…" : "Save"}
                           </button>
@@ -380,26 +361,26 @@ export default function AdminDashboard() {
               </div>
             </Card>
 
-            <Card title="Match History">
+            <Card title="Match history" flush>
               {recentMatches.length === 0 ? (
-                <p className="text-sm text-zinc-500 dark:text-zinc-400">No matches recorded yet.</p>
+                <p className="px-5 py-8 text-center text-sm text-muted">No matches recorded yet.</p>
               ) : (
-                <ul className="max-h-[32rem] space-y-2 overflow-y-auto pr-1">
+                <ul className="max-h-[32rem] divide-y divide-line overflow-y-auto">
                   {recentMatches.map((m) =>
                     editingMatchId === m.id ? (
                       <li
                         key={m.id}
-                        className="flex flex-col gap-2 rounded-lg bg-zinc-100 px-3 py-3 text-sm dark:bg-zinc-900"
+                        className="flex flex-col gap-3 bg-subtle px-5 py-4 text-sm"
                       >
                         <div className="flex flex-wrap items-end gap-2">
-                          <label className="flex flex-col gap-1 text-xs text-zinc-500 dark:text-zinc-400">
+                          <label className="flex flex-col gap-1.5 text-xs font-medium text-muted">
                             Winner
                             <select
                               value={matchEdit.winnerId}
                               onChange={(e) =>
                                 setMatchEdit((prev) => ({ ...prev, winnerId: e.target.value }))
                               }
-                              className="rounded-lg border border-zinc-300 bg-white px-2 py-1 text-sm outline-none focus:border-emerald-500 dark:border-zinc-700 dark:bg-zinc-950"
+                              className="field w-36"
                             >
                               {players.map((p) => (
                                 <option key={p.id} value={p.id}>
@@ -416,16 +397,16 @@ export default function AdminDashboard() {
                               setMatchEdit((prev) => ({ ...prev, winnerScore: e.target.value }))
                             }
                             placeholder="Score"
-                            className="w-20 rounded-lg border border-zinc-300 bg-white px-2 py-1 text-sm outline-none focus:border-emerald-500 dark:border-zinc-700 dark:bg-zinc-950"
+                            className="field w-20"
                           />
-                          <label className="flex flex-col gap-1 text-xs text-zinc-500 dark:text-zinc-400">
+                          <label className="flex flex-col gap-1.5 text-xs font-medium text-muted">
                             Loser
                             <select
                               value={matchEdit.loserId}
                               onChange={(e) =>
                                 setMatchEdit((prev) => ({ ...prev, loserId: e.target.value }))
                               }
-                              className="rounded-lg border border-zinc-300 bg-white px-2 py-1 text-sm outline-none focus:border-emerald-500 dark:border-zinc-700 dark:bg-zinc-950"
+                              className="field w-36"
                             >
                               {players.map((p) => (
                                 <option key={p.id} value={p.id}>
@@ -442,20 +423,20 @@ export default function AdminDashboard() {
                               setMatchEdit((prev) => ({ ...prev, loserScore: e.target.value }))
                             }
                             placeholder="Score"
-                            className="w-20 rounded-lg border border-zinc-300 bg-white px-2 py-1 text-sm outline-none focus:border-emerald-500 dark:border-zinc-700 dark:bg-zinc-950"
+                            className="field w-20"
                           />
                         </div>
                         <div className="flex gap-2">
                           <button
                             onClick={() => handleSaveMatch(m.id)}
                             disabled={savingMatchId === m.id}
-                            className="rounded-lg bg-emerald-600 px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                            className="btn btn-primary btn-sm"
                           >
                             {savingMatchId === m.id ? "Saving…" : "Save"}
                           </button>
                           <button
                             onClick={handleCancelEditMatch}
-                            className="rounded-lg border border-zinc-300 px-3 py-1 text-xs font-medium transition-colors hover:bg-white dark:border-zinc-700 dark:hover:bg-zinc-800"
+                            className="btn btn-secondary btn-sm"
                           >
                             Cancel
                           </button>
@@ -464,7 +445,7 @@ export default function AdminDashboard() {
                     ) : (
                       <li
                         key={m.id}
-                        className="flex items-center justify-between gap-3 rounded-lg bg-zinc-100 px-3 py-2 text-sm dark:bg-zinc-900"
+                        className="flex items-center justify-between gap-3 px-5 py-3 text-sm"
                       >
                         <span>
                           {(() => {
@@ -474,20 +455,20 @@ export default function AdminDashboard() {
                               : null;
                             return (
                               <>
-                                <span className="font-medium text-emerald-600 dark:text-emerald-400">
+                                <span className="font-medium">
                                   {playerName(m.winnerId)}
                                 </span>
                                 {delta !== null && (
-                                  <span className="ml-1 text-xs text-emerald-600/70 dark:text-emerald-400/70">
+                                  <span className="ml-1 text-xs text-muted">
                                     +{delta}
                                   </span>
                                 )}{" "}
                                 beat{" "}
-                                <span className="font-medium text-rose-500 dark:text-rose-400">
+                                <span className="font-medium">
                                   {playerName(m.loserId)}
                                 </span>
                                 {delta !== null && (
-                                  <span className="ml-1 text-xs text-rose-500/70 dark:text-rose-400/70">
+                                  <span className="ml-1 text-xs text-muted">
                                     -{delta}
                                   </span>
                                 )}
@@ -495,25 +476,25 @@ export default function AdminDashboard() {
                             );
                           })()}
                           {m.winnerScore !== undefined && m.loserScore !== undefined && (
-                            <span className="ml-1.5 text-zinc-400 dark:text-zinc-600">
+                            <span className="ml-1.5 tabular-nums text-muted">
                               {m.winnerScore}-{m.loserScore}
                             </span>
                           )}
-                          <span className="ml-2 text-xs text-zinc-500 dark:text-zinc-400">
+                          <span className="ml-2 text-xs text-muted">
                             {formatDate(m.playedAt)}
                           </span>
                         </span>
                         <div className="flex shrink-0 gap-2">
                           <button
                             onClick={() => handleStartEditMatch(m)}
-                            className="rounded-lg border border-zinc-300 px-3 py-1 text-xs font-medium transition-colors hover:bg-white dark:border-zinc-700 dark:hover:bg-zinc-800"
+                            className="btn btn-secondary btn-sm"
                           >
                             Edit
                           </button>
                           <button
                             onClick={() => handleUndo(m.id)}
                             disabled={undoingId === m.id}
-                            className="rounded-lg border border-zinc-300 px-3 py-1 text-xs font-medium transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:hover:bg-zinc-800"
+                            className="btn btn-secondary btn-sm"
                           >
                             {undoingId === m.id ? "Undoing…" : "Undo"}
                           </button>
@@ -525,8 +506,8 @@ export default function AdminDashboard() {
               )}
             </Card>
 
-            <Card title="Danger Zone">
-              <p className="mb-3 text-sm text-zinc-500 dark:text-zinc-400">
+            <Card title="Danger zone">
+              <p className="mb-4 text-sm text-muted">
                 Reset every player&apos;s wins and losses to zero and clear match history. This
                 cannot be undone.
               </p>
@@ -535,13 +516,13 @@ export default function AdminDashboard() {
                   <button
                     onClick={handleReset}
                     disabled={resetting}
-                    className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="btn bg-loss text-white hover:opacity-90"
                   >
-                    {resetting ? "Resetting…" : "Confirm Reset"}
+                    {resetting ? "Resetting…" : "Confirm reset"}
                   </button>
                   <button
                     onClick={() => setConfirmingReset(false)}
-                    className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium transition-colors hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-900"
+                    className="btn btn-secondary"
                   >
                     Cancel
                   </button>
@@ -549,15 +530,14 @@ export default function AdminDashboard() {
               ) : (
                 <button
                   onClick={() => setConfirmingReset(true)}
-                  className="rounded-lg border border-rose-300 px-4 py-2 text-sm font-medium text-rose-600 transition-colors hover:bg-rose-50 dark:border-rose-900 dark:text-rose-400 dark:hover:bg-rose-950"
+                  className="btn btn-secondary text-loss"
                 >
-                  Reset All Scores
+                  Reset all scores
                 </button>
               )}
             </Card>
           </div>
         )}
-      </div>
-    </div>
+    </main>
   );
 }
